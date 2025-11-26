@@ -96,6 +96,22 @@ func analyzeFile(src string) (GenericCounters, error) {
 								isTrivialConstraint = true
 							}
 
+							// Semantic Check: Is the constrant an empty interface defined elsewhere? 
+							// E.g. type MyInterface interface{}
+							// type Foo3[T MyInterface] struct {
+							// 		val T
+							// } 
+							if ident, ok := tp.Type.(*ast.Ident); ok {
+								obj := ident.Obj
+								if obj != nil {
+									if ts, ok := obj.Decl.(*ast.TypeSpec); ok {
+										if iface, ok := ts.Type.(*ast.InterfaceType); ok && iface.Methods != nil && iface.Methods.NumFields() == 0 {
+											isTrivialConstraint = true
+										}
+									}
+								}
+							}
+
 							if !isTrivialConstraint {
 								counters.StructGenericBound++
 								break
