@@ -6,10 +6,12 @@ import (
 )
 
 func main() {
-	token := ""                                                                                // Hier Github-Token eintragen
-	csvPath := "" // Hier Pfad zu Input-CSV eintragen
+	config, err := SetupEnvironment()
+	if err != nil {
+		log.Fatalf("Failed to set up environment: %v", err)
+	}
 
-	entries, _ := getOwnerAndRepo(csvPath)
+	entries, _ := getOwnerAndRepo(config.CSVPath)
 
 	counterOverEveryRepository := GenericCounters{}
 
@@ -17,7 +19,7 @@ func main() {
 	fmt.Println("Repository,FuncTotal,FuncGeneric,MethodTotal,MethodWithGenericReceiver,StructTotal,StructGeneric,StructGenericNonTrivialBound,TypeDecl,GenericTypeDecl,GenericTypeSet")
 
 	for _, repository := range entries {
-		files, err := fetchGoFilesList(repository[0], repository[1], token)
+		files, err := fetchGoFilesList(repository[0], repository[1], config.Token)
 		if err != nil {
 			log.Println(err)
 		} else {
