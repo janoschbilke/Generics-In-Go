@@ -96,11 +96,11 @@ func analyzeFile(src string) (GenericCounters, error) {
 								isTrivialConstraint = true
 							}
 
-							// Semantic Check: Is the constrant an empty interface defined elsewhere? 
+							// Semantic Check: Is the constrant an empty interface defined elsewhere?
 							// E.g. type MyInterface interface{}
 							// type Foo3[T MyInterface] struct {
 							// 		val T
-							// } 
+							// }
 							if ident, ok := tp.Type.(*ast.Ident); ok {
 								obj := ident.Obj
 								if obj != nil {

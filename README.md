@@ -57,3 +57,64 @@ CSV_PATH=../input/alleSourcegraph.csv
 
 Anschließend kann das Programm wie gewohnt ausgeführt werden.
 Bei Fehlern bitte den Output des Programms selbst betrachten.
+
+## Local Development Setup
+
+Das Programm unterstützt neben der Analyse von GitHub-Repositories auch die Analyse von **lokalen Go-Projekten**.
+Das ist nützlich für das Testen spezifischer Verhaltensmuster oder die Entwicklung neuer Features.
+
+### Aktivierung des lokalen Modus
+
+Um ein lokales Projekt zu analysieren, muss die Environment-Variable `LOCAL_PROJECT_PATH` gesetzt werden. Dies kann, analog zum generellen Projekt Setup, auf verschiedene Arten erfolgen:
+
+#### Option 1: Direkt als Environment-Variable
+
+```bash
+export LOCAL_PROJECT_PATH=/path/to/your/local/project
+cd GoParser
+go run .
+```
+
+#### Option 2: In der secrets.env Datei
+
+Füge die folgende Zeile zu deiner `secrets.env` Datei hinzu:
+
+```env
+GITHUB_TOKEN=ghp_...
+CSV_PATH=../input/alleSourcegraph.csv
+LOCAL_PROJECT_PATH=/absolute/path/to/LocalTestProject
+```
+
+**Hinweis:** Der Pfad sollte absolut sein, z.B.:
+
+- macOS/Linux: `/Users/username/project/LocalTestProject`
+- Windows: `C:/Users/username/project/LocalTestProject`
+
+### Verhalten im lokalen Modus
+
+Wenn `LOCAL_PROJECT_PATH` gesetzt ist:
+
+- Das Programm **ignoriert** die CSV-Datei und GitHub-Repositories
+- Es durchsucht **rekursiv** alle `.go`-Dateien im angegebenen Verzeichnis
+- Verzeichnisse wie `vendor`, `.git`, `node_modules` werden automatisch übersprungen
+- Die Analyse erfolgt mit den gleichen Metriken wie bei GitHub-Repositories
+
+### Test-Projekt
+
+Im Repository ist ein `LocalTestProject` enthalten, das verschiedene Generic-Patterns demonstriert:
+
+- Generic Functions mit Type Constraints
+- Generic Structs mit trivialen (`any`) und nicht-trivialen Constraints
+- Methods mit Generic Receivers
+- Type Sets (Union Types)
+- Normale (nicht-generische) Funktionen und Structs zum Vergleich
+
+### Wechsel zwischen Modi
+
+Um vom lokalen Modus zurück zum GitHub-Modus zu wechseln, entferne oder kommentiere die `LOCAL_PROJECT_PATH` Variable:
+
+```env
+# LOCAL_PROJECT_PATH=/path/to/project
+GITHUB_TOKEN=ghp_...
+CSV_PATH=../input/alleSourcegraph.csv
+```

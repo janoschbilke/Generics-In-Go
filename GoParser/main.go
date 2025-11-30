@@ -3,7 +3,48 @@ package main
 import (
 	"fmt"
 	"log"
+	"path/filepath"
 )
+
+func aggregateCounters(target *GenericCounters, source GenericCounters) {
+	target.FuncTotal += source.FuncTotal
+	target.FuncGeneric += source.FuncGeneric
+	target.MethodTotal += source.MethodTotal
+	target.MethodWithGenericReceiver += source.MethodWithGenericReceiver
+	target.StructTotal += source.StructTotal
+	target.StructGeneric += source.StructGeneric
+	target.StructGenericBound += source.StructGenericBound
+	target.TypeDecl += source.TypeDecl
+	target.GenericTypeDecl += source.GenericTypeDecl
+	target.GenericTypeSet += source.GenericTypeSet
+}
+
+func printCountersSummary(counters GenericCounters, title string) {
+	fmt.Println()
+	fmt.Printf("%s:\n", title)
+	fmt.Printf("FuncGeneric: %v\n", counters.FuncGeneric)
+	fmt.Printf("MethodWithGenericReceiver: %v\n", counters.MethodWithGenericReceiver)
+	fmt.Printf("StructGeneric: %v\n", counters.StructGeneric)
+	fmt.Printf("StructGenericNonTrivialBound: %v\n", counters.StructGenericBound)
+	fmt.Printf("GenericTypeDecl: %v\n", counters.GenericTypeDecl)
+	fmt.Printf("GenericTypeSet: %v\n", counters.GenericTypeSet)
+}
+
+func printCSVRow(name string, counters GenericCounters) {
+	fmt.Printf("%s,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d\n",
+		name,
+		counters.FuncTotal,
+		counters.FuncGeneric,
+		counters.MethodTotal,
+		counters.MethodWithGenericReceiver,
+		counters.StructTotal,
+		counters.StructGeneric,
+		counters.StructGenericBound,
+		counters.TypeDecl,
+		counters.GenericTypeDecl,
+		counters.GenericTypeSet,
+	)
+}
 
 func main() {
 	config, err := SetupEnvironment()
@@ -11,9 +52,46 @@ func main() {
 		log.Fatalf("Failed to set up environment: %v", err)
 	}
 
-	entries, _ := getOwnerAndRepo(config.CSVPath)
-
 	counterOverEveryRepository := GenericCounters{}
+
+	// Prüfe ob lokaler Modus aktiviert ist
+	if config.LocalProject != "" {
+		// === LOKALER MODUS ===
+		log.Printf("Running in LOCAL mode for project: %s", config.LocalProject)
+
+		files, err := fetchLocalGoFiles(config.LocalProject)
+		if err != nil {
+			log.Fatalf("Failed to load local files: %v", err)
+		}
+
+		log.Printf("Found %d .go files in local project", len(files))
+
+		countersForProject := GenericCounters{}
+
+		// CSV-Header ausgeben
+		fmt.Println("Repository,FuncTotal,FuncGeneric,MethodTotal,MethodWithGenericReceiver,StructTotal,StructGeneric,StructGenericNonTrivialBound,TypeDecl,GenericTypeDecl,GenericTypeSet")
+
+		for _, file := range files {
+			counts, err := analyzeFile(file)
+			if err != nil {
+				log.Println("Error:", err)
+			} else {
+				aggregateCounters(&countersForProject, counts)
+			}
+		}
+
+		// Ausgabe für lokales Projekt
+		projectName := "local/" + filepath.Base(config.LocalProject)
+		printCSVRow(projectName, countersForProject)
+
+		// Gesamt-Statistik
+		printCountersSummary(countersForProject, "Counter for local project")
+
+		return
+	}
+
+	// === GITHUB MODUS (wie bisher) ===
+	entries, _ := getOwnerAndRepo(config.CSVPath)
 
 	// CSV-Header anpassen
 	fmt.Println("Repository,FuncTotal,FuncGeneric,MethodTotal,MethodWithGenericReceiver,StructTotal,StructGeneric,StructGenericNonTrivialBound,TypeDecl,GenericTypeDecl,GenericTypeSet")
@@ -30,17 +108,7 @@ func main() {
 				if err != nil {
 					log.Println("Error:", err)
 				} else {
-					// alle Felder aufsummieren
-					countersForEntireRepo.FuncTotal += counts.FuncTotal
-					countersForEntireRepo.FuncGeneric += counts.FuncGeneric
-					countersForEntireRepo.MethodTotal += counts.MethodTotal
-					countersForEntireRepo.MethodWithGenericReceiver += counts.MethodWithGenericReceiver
-					countersForEntireRepo.StructTotal += counts.StructTotal
-					countersForEntireRepo.StructGeneric += counts.StructGeneric
-					countersForEntireRepo.StructGenericBound += counts.StructGenericBound
-					countersForEntireRepo.TypeDecl += counts.TypeDecl
-					countersForEntireRepo.GenericTypeDecl += counts.GenericTypeDecl
-					countersForEntireRepo.GenericTypeSet += counts.GenericTypeSet
+					aggregateCounters(&countersForEntireRepo, counts)
 				}
 			}
 
@@ -67,29 +135,11 @@ func main() {
 			log.Printf("Finished repository: %s/%s", repository[0], repository[1])
 
 			// CSV-Ausgabe pro Repo
-			fmt.Printf("%s/%s,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d\n",
-				repository[0], repository[1],
-				countersForEntireRepo.FuncTotal,
-				countersForEntireRepo.FuncGeneric,
-				countersForEntireRepo.MethodTotal,
-				countersForEntireRepo.MethodWithGenericReceiver,
-				countersForEntireRepo.StructTotal,
-				countersForEntireRepo.StructGeneric,
-				countersForEntireRepo.StructGenericBound,
-				countersForEntireRepo.TypeDecl,
-				countersForEntireRepo.GenericTypeDecl,
-				countersForEntireRepo.GenericTypeSet,
-			)
+			repoName := repository[0] + "/" + repository[1]
+			printCSVRow(repoName, countersForEntireRepo)
 		}
 	}
 
 	// Gesamt-Statistik am Ende
-	fmt.Println()
-	fmt.Println("Counter over every Repository:")
-	fmt.Printf("FuncGeneric: %v\n", counterOverEveryRepository.FuncGeneric)
-	fmt.Printf("MethodWithGenericReceiver: %v\n", counterOverEveryRepository.MethodWithGenericReceiver)
-	fmt.Printf("StructGeneric: %v\n", counterOverEveryRepository.StructGeneric)
-	fmt.Printf("StructGenericNonTrivialBound: %v\n", counterOverEveryRepository.StructGenericBound)
-	fmt.Printf("GenericTypeDecl: %v\n", counterOverEveryRepository.GenericTypeDecl)
-	fmt.Printf("GenericTypeSet: %v\n", counterOverEveryRepository.GenericTypeSet)
+	printCountersSummary(counterOverEveryRepository, "Counter over every Repository")
 }
