@@ -1,40 +1,20 @@
 package main
 
 import (
+	"GoParser/model"
 	"go/ast"
 	"go/parser"
 	"go/token"
 )
 
-type GenericCounters struct {
-	// Funktionen
-	FuncTotal   int
-	FuncGeneric int
-
-	// Methoden
-	MethodTotal               int
-	MethodWithGenericReceiver int
-
-	// Structs
-	StructTotal              int
-	StructGeneric            int
-	StructGenericBound       int
-	StructAsTypeBound        int 
-
-	// Sonstiges
-	TypeDecl        int
-	GenericTypeDecl int
-	GenericTypeSet  int
-}
-
-func analyzeFile(src string) (GenericCounters, error) {
+func analyzeFile(src string) (model.GenericCounters, error) {
 	fset := token.NewFileSet()
 	file, err := parser.ParseFile(fset, "", src, parser.AllErrors)
 	if err != nil {
-		return GenericCounters{}, err
+		return model.GenericCounters{}, err
 	}
 
-	counters := GenericCounters{}
+	counters := model.GenericCounters{}
 
 	ast.Inspect(file, func(n ast.Node) bool {
 		switch node := n.(type) {
