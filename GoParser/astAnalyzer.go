@@ -1,36 +1,14 @@
 package main
 
 import (
+	"GoParser/model"
 	"go/ast"
 	"go/parser"
 	"go/token"
 )
 
-type GenericCounters struct {
-	// Funktionen
-	FuncTotal   int
-	FuncGeneric int
-
-	// Methoden
-	MethodTotal                                 int
-	MethodWithGenericReceiver                   int
-	MethodWithGenericReceiverTrivialTypeBound   int // Erweiterung 3
-	MethodWithGenericReceiverNonTrivialTypeBound int // Erweiterung 3
-
-	// Structs
-	StructTotal              int
-	StructGeneric            int
-	StructGenericBound       int
-	StructAsTypeBound        int // Erweiterung 2
-
-	// Sonstiges
-	TypeDecl        int
-	GenericTypeDecl int
-	GenericTypeSet  int
-}
-
 type ASTAnalyzer interface {
-	AnalyzeFile(src string) (GenericCounters, error)
+	AnalyzeFile(src string) (model.GenericCounters, error)
 }
 
 type astAnalyzerImpl struct{}
@@ -39,11 +17,11 @@ func NewASTAnalyzer() ASTAnalyzer {
 	return &astAnalyzerImpl{}
 }
 
-func (a *astAnalyzerImpl) AnalyzeFile(src string) (GenericCounters, error) {
+func (a *astAnalyzerImpl) AnalyzeFile(src string) (model.GenericCounters, error) {
 	fset := token.NewFileSet()
 	file, err := parser.ParseFile(fset, "", src, parser.AllErrors)
 	if err != nil {
-		return GenericCounters{}, err
+		return model.GenericCounters{}, err
 	}
 
 	// First pass: collect type bounds information (for Erweiterung 2 & 3)
@@ -52,7 +30,7 @@ func (a *astAnalyzerImpl) AnalyzeFile(src string) (GenericCounters, error) {
 	// Second pass: analyze file with information about type bounds available
 	counters, err := analyzeASTAndGetCounters(file, typeBoundsInfo)
 	if err != nil {
-		return GenericCounters{}, err
+		return model.GenericCounters{}, err
 	}
 
 	return counters, nil
@@ -71,7 +49,7 @@ func collectTypeBoundsInfo(file *ast.File) map[string]TypeBoundInfo {
 		if typeSpec, ok := n.(*ast.TypeSpec); ok {
 			if typeSpec.TypeParams != nil && len(typeSpec.TypeParams.List) > 0 {
 				info := TypeBoundInfo{}
-				
+
 				for _, tp := range typeSpec.TypeParams.List {
 					if tp.Type != nil {
 						isTrivial := false
@@ -117,8 +95,8 @@ func collectTypeBoundsInfo(file *ast.File) map[string]TypeBoundInfo {
 	return typeBoundsInfo
 }
 
-func analyzeASTAndGetCounters(file *ast.File, typeBoundsInfo map[string]TypeBoundInfo) (GenericCounters, error) {
-	counters := GenericCounters{}
+func analyzeASTAndGetCounters(file *ast.File, typeBoundsInfo map[string]TypeBoundInfo) (model.GenericCounters, error) {
+	counters := model.GenericCounters{}
 
 	ast.Inspect(file, func(n ast.Node) bool {
 		switch node := n.(type) {
@@ -188,14 +166,14 @@ func analyzeASTAndGetCounters(file *ast.File, typeBoundsInfo map[string]TypeBoun
 				counters.StructTotal++
 				if node.TypeParams != nil && len(node.TypeParams.List) > 0 {
 					counters.StructGeneric++
-					
+
 					// Use collected type bounds info from first pass
 					if info, exists := typeBoundsInfo[node.Name.Name]; exists {
 						// Erweiterung 1: Count structs with non-trivial bounds
 						if info.hasNonTrivialBound {
 							counters.StructGenericBound++
 						}
-						
+
 						// Erweiterung 2: Count structs that have a struct as type bound
 						if info.hasStructBound {
 							counters.StructAsTypeBound++
