@@ -10,7 +10,7 @@ import (
 	utils "GoParser/utils"
 )
 
-func aggregateCounters(target *GenericCounters, source GenericCounters) {
+func aggregateCounters(target *model.GenericCounters, source model.GenericCounters) {
 	target.FuncTotal += source.FuncTotal
 	target.FuncGeneric += source.FuncGeneric
 	target.MethodTotal += source.MethodTotal
@@ -40,7 +40,7 @@ func printCountersSummary(counters model.GenericCounters, title string) {
 	fmt.Printf("GenericTypeSet: %v\n", counters.GenericTypeSet)
 }
 
-func printCSVRow(name string, counters GenericCounters) {
+func printCSVRow(name string, counters model.GenericCounters) {
 	fmt.Printf("%s,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d\n",
 		name,
 		counters.FuncTotal,
