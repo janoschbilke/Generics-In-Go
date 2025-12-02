@@ -21,7 +21,6 @@
   - [Ausblick](#ausblick)
   - [Quellenverzeichnis](#quellenverzeichnis)
 
-
 ## Grundlagen Generics in Go
 
 Generics in Go ermöglichen es, Code zu schreiben, der unabhängig von spezifischen Datentypen funktioniert. Sie wurden mit Go 1.18 eingeführt und stellen eine der bedeutendsten Ergänzungen zur Sprache dar, seit ihrer ersten Veröffentlichung. Im Kern erlauben Generics die Definition von Funktionen und Typen, die mit einer Vielzahl von Typen arbeiten können, ohne dass der Code für jeden Typ separat geschrieben werden muss. Dies fördert die Wiederverwendbarkeit und reduziert Redundanz.
@@ -167,6 +166,7 @@ type RecursiveList[T any] struct {
     Tail *RecursiveList[RecursiveList[T]]
 }
 ```
+
 Dieser Code würde beim Versuch der Kompilierung fehlschlagen, da der Compiler die unendliche Instantiierungssequenz nicht auflösen kann. Ansätze, die rein auf Dictionary-Passing basieren, könnten solche Fälle besser handhaben.
 
 #### Code-Bloat und Kompilierzeiten
@@ -174,6 +174,7 @@ Dieser Code würde beim Versuch der Kompilierung fehlschlagen, da der Compiler d
 Die Spezialisierung für jeden verwendeten Typ kann zu dupliziertem Code führen, was die Größe der resultierenden Binärdatei erhöht ("Code Bloat") und die Kompilierungszeiten verlangsamt. Benchmarks in verwandten Forschungsarbeiten zeigten, dass reine Monomorphisierungs-Übersetzer (wie in Go 1.18) deutlich langsamere Kompilierzeiten aufweisen können als nicht-spezialisierende Methoden. Das Go-Team arbeitet jedoch kontinuierlich an Verbesserungen, um diesen Effekt zu minimieren.
 
 Beispiel: Eine generische Funktion, die mit vielen verschiedenen Typen aufgerufen wird, erzeugt multiple, spezialisierte Versionen ihres eigenen Codes:
+
 ```go
 func Process[T any](data []T) { /* ... */ }
 
@@ -203,6 +204,7 @@ func (p Pair[T, S]) Show() string {
 ```
 
 Ein flexiblerer Ansatz, bei dem die Constraints erst in der Methode definiert werden, ist in Go nicht erlaubt:
+
 ```go
 type FlexiblePair[T any, S any] struct {
     Left  T
@@ -216,6 +218,7 @@ func (p FlexiblePair[T Show, S Show]) Show() string {
 }
 */
 ```
+
 Interessanterweise ist dieses Muster für eigenständige Funktionen gültig, was die Design-Entscheidung für Methoden uneinheitlich erscheinen lässt.
 
 **2. Keine Typ-Zusicherungen (Type Assertions) für Typ-Parameter:**
@@ -229,7 +232,9 @@ func process[T any](value T) {
     // ...
 }
 ```
+
 Der Workaround besteht darin, den Wert zuerst in `any` (oder `interface{}`) zu konvertieren und die Zusicherung dann darauf auszuführen.
+
 ```go
 // GÜLTIG:
 func process[T any](value T) {
@@ -237,91 +242,109 @@ func process[T any](value T) {
     // ...
 }
 ```
+
 Diese Einschränkung wurde bewusst in das Sprachdesign aufgenommen, um Verwirrung zu vermeiden, erfordert jedoch einen expliziten Zwischenschritt.
 [4](#quellenverzeichnis)
 **3. Weitere Einschränkungen bei Constraints:**
-*   **Keine variadischen Typ-Parameter:** Es ist nicht möglich, eine generische Funktion mit einer variablen Anzahl von Typ-Parametern zu definieren.
-*   **Keine Operator-Überladung:** Constraints können zwar das Vorhandensein von Operatoren wie `+` oder `==` fordern (z.B. über `comparable`), aber es gibt keine Möglichkeit, das Verhalten dieser Operatoren für benutzerdefinierte Typen zu definieren.
+-**Keine variadischen Typ-Parameter:** Es ist nicht möglich, eine generische Funktion mit einer variablen Anzahl von Typ-Parametern zu definieren.
+-**Keine Operator-Überladung:** Constraints können zwar das Vorhandensein von Operatoren wie `+` oder `==` fordern (z.B. über `comparable`), aber es gibt keine Möglichkeit, das Verhalten dieser Operatoren für benutzerdefinierte Typen zu definieren.
 
 #### Weitere beachtenswerte Punkte
 
-*   **Begrenzte GC-Shape-Unterstützung:** Frühe Versionen von Go-Generics (z.B. 1.18) betrachteten für die Wiederverwendung von generischem Code durch den Garbage Collector hauptsächlich, ob ein Typ ein Pointer ist. Dies schränkt die Effizienz der Dictionary-Nutzung und Code-Größenreduktion ein.
-*   **Schwache Typinferenz:** In komplexeren Fällen, insbesondere wenn ein Typ-Parameter nur in der Rückgabeposition einer Funktion vorkommt, kann der Compiler den Typ nicht immer selbst herleiten, was explizite Typ-Argumente beim Aufruf erfordert 
+-**Begrenzte GC-Shape-Unterstützung:** Frühe Versionen von Go-Generics (z.B. 1.18) betrachteten für die Wiederverwendung von generischem Code durch den Garbage Collector hauptsächlich, ob ein Typ ein Pointer ist. Dies schränkt die Effizienz der Dictionary-Nutzung und Code-Größenreduktion ein.
+-**Schwache Typinferenz:** In komplexeren Fällen, insbesondere wenn ein Typ-Parameter nur in der Rückgabeposition einer Funktion vorkommt, kann der Compiler den Typ nicht immer selbst herleiten, was explizite Typ-Argumente beim Aufruf erfordert
 [5](#quellenverzeichnis).
 Diese Limitationen machen Go-Generics robust und pragmatisch, aber weniger expressiv als in Sprachen wie Rust, C++ oder Haskell [6](#quellenverzeichnis). Die Designentscheidungen zielen darauf ab, die Komplexität des Typsystems zu beherrschen und die charakteristische schnelle Kompilierzeit und Einfachheit von Go so weit wie möglich zu erhalten.
 
 ## Grobflächige Analyse
+
 Es wurden zunächst verschiedene Strategieen untersucht, um eine grobe Analyse zur Verwendung von Generics in Go anzustellen. Unteranderem wurden rudimentäre Google Suche und die Github-Suchfunktion verwendet. Mit diesen Suchfunktionen konnte jedoch keine sinnvolle Erkenntnis erlangt werden. Weiterhin wurde ein Haskell-Parser in Erwägung gezogen, allerdings nicht verwendet, da dieser initial nicht in der Lage war die Anforderungen für eine Codeanalyse zu Generics in Go zu bewältigen und die Erweiterung des Parsers den Zeitrahmen dieser Arbeit sprengen würde. Es wurde daher zunächst ein Ansatz mit Sourcegraph aus einer vorherigen Masterarbeit gewählt, mit dem Ziel diesen zu verfeinern.
 In der ursprünglichen Masterarbiet wird Sourcegraph als zentrales Tool vorgestellt, das durch seine fortschrittlichen Suchfunktionen – insbesondere die Unterstützung regulärer Ausdrücke – eine effiziente Analyse von Quellcode über große Repositories hinweg ermöglicht. Diese Arbeit erweitert diese Ansätze, indem sie die entwickelten regulären Ausdrücke und Suchstrategien überprüft und die Daten auffrischt.
 
 Sourcegraph ist eine leistungsstarke Plattform für Codesuche und -Navigation, die Entwicklern hilft, Quellcode über Repositories und Sprachen hinweg zu durchsuchen und Abhängigkeiten zu identifizieren. Als kommerzielles Produkt für Unternehmen kann es selbst gehostet werden, um eigene Codebasen zu indexieren. Eine kostenlose öffentliche Instanz indexiert populäre GitHub-Repos (basierend auf Sternen), die über eine Million Repos umfasst. Die Syntax ähnelt der GitHub-Suche, bietet aber erweiterte Funktionen und ermöglicht die Indexierung alternativer Plattformen. Der Rechercheansatz nutzt reguläre Ausdrücke, um generische Go-Konstrukte (z. B. nach Go-Benennungsregeln) zu suchen. Für verschiedene Arten von Generics in Go wurden spezifische RegEx erstellt, ergänzt durch eine Beispielsuche nach allen Go-Projekten via Sourcegraph-Query (`context:global language:Go select:repo count:all`), die Repos statt einzelner Codestellen auflistet und alle Ergebnisse liefert. Die folgenden regulären Ausdrücke dienen der Suche nach den bereits oben genannte Arten von Generics in Go und sind so wie die folgenden Beispiele teilweise direkt aus der vorherigen Arbeit übernommen. Die Suche wurde dabei über die Suchleiste der sourcegraph Website durchgeführt, wobei Forks und archivierte Repos nicht miteinbezogen wurden.
 
-
 **Suche nach generischen Funktionssignaturen:**  
 Beispiel:
+
 ```go
 func PickRandom[T any](choices []ChoiceWeight[T]) T {
-	...
+    ...
 }
 ```
+
 Ursprünglicher (fehlerhafter) RegEx:
-```
+
+```text
 /func\s*?(\(.+?\))?\s*?[a-zA-Z_]\w*?\s*?\[.+?\]\s*?\(.*?\).*?\{/
 ```
+
 Dieser reguläre Ausdruck wurde angepasst, um false positives auszuschließen. Zum Beispiel würde dieser RegEx auf folgende Funktionssignatur anspringen, obwohl es sich hierbei um einen Array und nicht um eine genereische Funktion handelt:
+
 ```go
 func InvalidGeneric[123](param string) error {
     fmt.Println(param)
     return nil
 }
 ```
+
 Es wurde folglich ein robusterer und strengerer regulärer Ausdruck entwickelt, um mehr false positives auszuschließen.
 
 Neuer, robuster RegEx:
-```
+
+```text
 /func\s*?(\(.+?\))?\s*?[a-zA-Z_]\w*?\s*?\[\s*?[a-zA-Z_]\w*?\s*?(?:,\s*?[a-zA-Z_]\w*?)*\s*?(?:any|comparable|interface\s*?\{.*?\}|~[a-zA-Z_]\w*?(?:\s*?\|\s*?~?[a-zA-Z_]\w*?)*)\s*?\]\s*?\(.*?\).*?\{/
 ```
 
 **Suche nach Deklarationen von Typ Parametern:**  
 Beispiel:
+
 ```go
 type Tree[T interface{}] struct {
     left, right *Tree[T]
     value       T
 }
 ```
+
 Ursprünglicher (fehlerhafter) RegEx:
-```
+
+```text
 /type\s+?[a-zA-Z_]\w*?\s*?\[.+?\]\s+?(struct|interface)\s*?\{/
 ```
 
 Auch dieser RegEx leidet unter dem Problem, dass er auf Arrays anspringt. Ein beispielhaftes false positive wäre somit:
+
 ```go
 // False Positive: Array mit fester Größe, keine Generics
 type FixedArray[10] struct {
     data [10]int
 }
 ```
+
 Um dies in Zukunft vorzubeugen wurde dieser neue, robustere RegEx entwickelt, welcher nicht mehr auf die aufgezeigten false positives anschlägt.
 
 Neuer RegEx:
-```
+
+```text
 /type\s+?[a-zA-Z_]\w*?\s*?\[\s*?[a-zA-Z_]\w*?\s*?(?:,\s*?[a-zA-Z_]\w*?)*\s*?(?:any|comparable|interface\s*?\{.*?\}|~[a-zA-Z_]\w*?(?:\s*?\|\s*?~?[a-zA-Z_]\w*?)*)\s*?\]\s+?(struct|interface)\s*?\{/
 ```
 
 **Suche nach Deklaration von Type Sets**:  
 Beispiel:
+
 ```go
 type Ordered interface {
     Integer|Float|~string
 }
 ```
+
 ursprünglicher (fehlerhafter) RegEx:
-```
+
+```text
 /type\s+?[a-zA-Z_]\w*?\s+?interface\s*?{(\n)?[^|}]*\|.*?(\n)?}/
 ```
 
 Auch dieser RegEx schlägt auf einige false positives an, wie zum Beispiel bei dieser Typdeklaration:
+
 ```go
 // False Positive: Interface mit Methode, die `|` in der Signatur hat
 type BitOperation interface {
@@ -332,17 +355,21 @@ type BitOperation interface {
 Hierbei handelt es sich nicht um ein generisches Typeset sondern einen Rückgabetyp mit `|`. Der ursprüngliche RegEx würde hier fälschlicherweise anschlagen, weswegen dieser robustere RegEx entwickelt wurde.
 
 Neuer RegEx:
-```
+
+```text
 /type\s+?[a-zA-Z_]\w*?\s+?interface\s*?\{\s*?(?:~?[a-zA-Z_0-9\.\*]+(?:\s*?\|\s*?~?[a-zA-Z_0-9\.\*]+)+)\s*?\}/
 ```
 
 **Suche nach Verwendung von Type Assertion:**  
 Beispiel:
+
 ```go
 price = first(product).(float32)
 ```
+
 RegEx:
-```
+
+```text
 /\.\(.+?\)/
 ```
 
@@ -359,13 +386,16 @@ Die Ergebnisse der Untersuchungen laute dann (Stand 21.09.2025):
 | => Repos being in 1), 2), or 3) or using type assertions | 32224 |
 
 ### Anmerkung zu RegEx und Motivation für einen GoParser
-Eine wichtige Anmerkung zur Verwendung der oben aufgezeigten RegEx ist, dass diese mit der Hilfe von Sourcegraph den Text in den Dateien der jeweiligen Repositories untersuchen. Es wird dabei tatsächlich der Text und nicht nur der Code untersucht, wodurch die RegEx in einigen Fällen auch auf Repositories anschlugen, welche keine tatsächliche Verwendung von Generics beinhalteten und lediglich generischen **auskommentierten** Code beinhalteten. In diesen Fällen kann wohl kaum von der Verwendung von Generics in go gesprochen werden. Es handlet sich also offensichtlich um weitere false positives, welche sich nicht mit der Funktionalität von Sourcegraph beheben lassen. 
+
+Eine wichtige Anmerkung zur Verwendung der oben aufgezeigten RegEx ist, dass diese mit der Hilfe von Sourcegraph den Text in den Dateien der jeweiligen Repositories untersuchen. Es wird dabei tatsächlich der Text und nicht nur der Code untersucht, wodurch die RegEx in einigen Fällen auch auf Repositories anschlugen, welche keine tatsächliche Verwendung von Generics beinhalteten und lediglich generischen **auskommentierten** Code beinhalteten. In diesen Fällen kann wohl kaum von der Verwendung von Generics in go gesprochen werden. Es handlet sich also offensichtlich um weitere false positives, welche sich nicht mit der Funktionalität von Sourcegraph beheben lassen.
 Aufgrund dessen entscheiden wir uns einen feingranulareren Ansatz zu verfolgen, welcher robuster gegenüber den zuvor erwähnten false positives ist. Bei diesem Ansatz handelt es sich um einen eigens entwickelten **GoParser** mit AST-Analyse.
 
-## GoParser 
+## GoParser
+
 GoParser ist ein Tool zur Analyse von Go-Quellcode in GitHub-Repositorys mit Fokus auf die Verwendung von Generics in Go. Es verarbeitet Go-Dateien, um verschiedene generische und nicht-generische Konstrukte wie Funktionen, Methoden, Strukturen und Typdeklarationen zu zählen, und erstellt einen CSV-Bericht mit einer Zusammenfassung der Ergebnisse. Das Tool ist besonders nützlich, um die Akzeptanz und Implementierungsmuster von Generics in Go-Projekten zu untersuchen.
 
 ### Funktionsweise
+
 GoParser lädt und analysiert Go-Quellcode aus angegebenen GitHub-Repositorys. Der Ablauf umfasst folgende Schritte:
 
 1. Repository-Eingabe: Liest eine CSV-Datei ein, die GitHub-Repositorys im Format github.com/owner/repo enthält. Jede Zeile liefert den Eigentümer (owner) und den Repository-Namen (repo).
@@ -378,7 +408,6 @@ GoParser lädt und analysiert Go-Quellcode aus angegebenen GitHub-Repositorys. D
    - Strukturen: Gesamtzahl (StructTotal), generische Strukturen (StructGeneric) und generische Strukturen mit nicht-trivialen Constraints (StructGenericBound, d. h. Constraints ungleich any).
    - Typdeklarationen: Generische Typdeklarationen (GenericTypeDecl) und Type Sets in Interfaces (GenericTypeSet).
 
-
 5. Aggregation: Summiert die Zähler für jedes Repository und aggregiert Statistiken über alle Repositorys hinweg, z. B. wie viele Repositorys generische Funktionen enthalten.
 6. Ausgabe: Erzeugt eine CSV-Ausgabe für jedes Repository mit den gezählten Werten und eine abschließende Statistik über alle Repositorys.
 
@@ -390,13 +419,16 @@ Um GoParser zu verwenden muss Go in Version 1.18 oder höher installiert sein, d
 
 Zusätzlich wird eine Eingabe-csv benötigt, welche im Format *Match type,Repository,Repository external URL* vorliegen sollte. Diese Format entspricht den csvs, welche man bekommt, wenn man die Ergebnisse aus sourcegrapgh exportiert. Der Pfad zu dieser csv wird dann ebenfalls in der main.go-Datei in die Variable **csvPath** eingefügt.
 
-Sind diese Vorraussetzungen erfüllt kann die Datei mit 
-```
+Sind diese Vorraussetzungen erfüllt kann die Datei mit
+
+```bash
 go run . > output.csv
 ```
+
 ausgeführt werden. Die Ausgabe des Programmes wird dann automatisch in die Datei *output.csv* geschrieben.
 
 Der GoParser kann dabei natürlich frei an Bedürfnisse und Anwendungsfälle angepasst werden. Die verschiedenen Dateien verfolgen dabei die folgenden Funktionen:
+
 - **astAnalyzer.go**: Hier geschieht die AST-Analyse des Parsers.
 - **csvUtil.go**: Liest die Zeilen der Eingabe csv Datei ein und formatiert sie für den Parser.
 - **githubUtil.go**: Downloadet die Repositories aus der Eingabe csv Datei als .zip, entpackt diese und gibt die Dateien in einem String Array zurück.
@@ -421,11 +453,9 @@ Außerdem wurde das Tool auf zehn spezifisch ausgewählten, bekannteren Reposito
 | hashicorp/consul         | 9400      | 93          | 12684       | 123                       | 3581        | 44            | 34                           | 4463     | 68              | 0              |
 | juju/juju                | 12192     | 149         | 81184       | 80                        | 20204       | 27            | 5                            | 23369    | 35              | 2              |
 
-
 Die Ergebnisse stellen klar dar, dass Generics in Go vor allem in  großen, typintensiven Projekten wie golang/go und kubernetes/kubernetes weit verbreitet sind. Kleinere oder spezialisierte Projekte wie etcd-io/etcd setzen Generics gezielt, aber zurückhaltend ein. Generische Funktionen und Methoden kommen dabei unabhängig von der Repository-Größe deutlich häufiger vor als Generische Strukturen. Generell ist die Anzahl an Generischen Bausteinen bisher eher zurückhaltend. Gerade anhand des golang/go-Repositories kann man aber gut erkennen, dass Generics zumindest in großen Projekten regelmäßig verwendet werden.
 
 Ein weiterer bemerkenswerter Punkt sind die hohe Gesamtanzahl an structs in kubernetes, golang und moby. Im Vergleich zu diesen ist die Anzahl von generischen structs bzw Funktionen und Methoden deutlich geringer. Generell ist das Verhältnis von structs zu Methoden und Funktionen etwa gleichbleibend. Ähnliche Zahlen liefert außerdem auch sourcegraph, wie [hier](https://sourcegraph.com/search?q=repo:%5Egithub%5C.com/kubernetes/kubernetes%24%40master+%5Cbtype%5Cs%2B(%5BA-Z%5D%5BA-Za-z0-9_%5D*)%5Cs%2Bstruct%5Cs*%5C%7B++count:50000&patternType=regexp&sm=0) zu sehen. Für ein genaueres Verständnis der Zusammenhänge dort, benötigt es noch weitere Forschung.
-
 
 ## Verwendung von Large Language Models zur Analyse von Generics in Go
 
@@ -449,12 +479,11 @@ Zusammenfassend bieten Generics in Go eine wertvolle Ergänzung für die Entwick
 
 Für zukünftige Untersuchungen zu Generics in Go bieten sich mehrere Ansätze an, um deren Verwendung, Akzeptanz und Auswirkungen umfassender zu beleuchten. Ein zentraler Schritt wäre eine vertiefte semantische Analyse, die nicht nur syntaktische Vorkommen erfasst, sondern auch den kontextuellen Einsatz sowie Effizienz, Integration in bestehende Projekte und die Auswirkungen auf Codequalität, Performanz und Wartbarkeit untersucht. Darüber hinaus fehlt bislang eine repräsentative Befragung von Experten, die sowohl quantitative als auch qualitative Einblicke in die Wahrnehmung, Nutzung und Herausforderungen von Generics liefern könnte. In diesem Zusammenhang wurden bereits Fachleute aus Open-Source-Projekten wie Kubernetes und Golang kontaktiert. Im Zuge dessen wurden die Fachleute mit Fragen zur praktischen Verwendung und ihren Erfahrungen, zu Limitationen sowie zur Einschätzung der zukünftigen Entwicklung, um eine Einschätzung gebeten. Da bisher keine Rückmeldungen eingegangen sind, bleibt hier eine Lücke bestehen, die weitere Anstrengungen erfordert. Solche Erweiterungen könnten die Analyse um wertvolle qualitative Aspekte bereichern und zu fundierteren Empfehlungen sowie einer umfassenderen Bewertung der Rolle von Generics in Go beitragen. Besonders die Befragung von Fachleuten stellt eine wichtige Einsicht dar, um einen Überblick über die tatsächliche Einsetzung von Generics in weitverbreiteten und massiven Projekten zu beurteilen.
 
-
-
 ## Quellenverzeichnis
-[1] Sulzmann, M., & Wehr, S. (2023). A Type-Directed, Dictionary-Passing Translation of Method Overloading and Structural Subtyping in Featherweight Generic Go. arXiv preprint arXiv:2209.08511. https://arxiv.org/abs/2209.08511 </br>
-[2] https://go.dev/ref/spec#Type_parameter_declarations </br>
-[3] https://go.googlesource.com/proposal/+/refs/heads/master/design/43651-type-parameters.md#No-parameterized-methods </br>
-[4] https://appliedgo.com/blog/a-tip-and-a-trick-when-working-with-generics </br>
-[5] https://multithreaded.stitchfix.com/blog/2023/02/01/go-polymorphic-interfaces/ </br>
-[6] https://www.dolthub.com/blog/2024-11-22-are-golang-generics-simple-or-incomplete-1/ </br>
+
+[1] Sulzmann, M., & Wehr, S. (2023). A Type-Directed, Dictionary-Passing Translation of Method Overloading and Structural Subtyping in Featherweight Generic Go. arXiv preprint arXiv:2209.08511. <https://arxiv.org/abs/2209.08511> </br>
+[2] <https://go.dev/ref/spec#Type_parameter_declarations> </br>
+[3] <https://go.googlesource.com/proposal/+/refs/heads/master/design/43651-type-parameters.md#No-parameterized-methods> </br>
+[4] <https://appliedgo.com/blog/a-tip-and-a-trick-when-working-with-generics> </br>
+[5] <https://multithreaded.stitchfix.com/blog/2023/02/01/go-polymorphic-interfaces/> </br>
+[6] <https://www.dolthub.com/blog/2024-11-22-are-golang-generics-simple-or-incomplete-1/> </br>

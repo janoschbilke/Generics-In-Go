@@ -1,4 +1,4 @@
-package main
+package utils
 
 import (
 	"os"
@@ -8,7 +8,7 @@ import (
 
 // fetchLocalGoFiles durchläuft ein lokales Verzeichnis rekursiv
 // und sammelt alle .go-Dateien (außer vendor, .git, etc.)
-func fetchLocalGoFiles(projectPath string) ([]string, error) {
+func FetchLocalGoFiles(projectPath string) ([]string, error) {
 	var files []string
 
 	err := filepath.Walk(projectPath, func(path string, info os.FileInfo, err error) error {

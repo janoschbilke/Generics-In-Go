@@ -1,4 +1,4 @@
-package main
+package utils
 
 import (
 	"archive/zip"
@@ -15,7 +15,7 @@ import (
 
 // fetchGoFilesList lädt das gesamte Repository als ZIP herunter,
 // entpackt alle .go-Dateien und gibt deren Inhalte als []string zurück.
-func fetchGoFilesList(owner, repo, token string) ([]string, error) {
+func FetchGoFilesList(owner, repo, token string) ([]string, error) {
 	ctx := context.Background()
 	var client *github.Client
 	if token != "" {
@@ -48,7 +48,7 @@ func fetchGoFilesList(owner, repo, token string) ([]string, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("Fehler beim Laden des ZIPs: %s", resp.Status)
+		return nil, fmt.Errorf("konnte ZIP nicht laden: %s", resp.Status)
 	}
 
 	data, err := io.ReadAll(resp.Body)

@@ -1,4 +1,4 @@
-module example/hello
+module GoParser
 
 go 1.25.0
 

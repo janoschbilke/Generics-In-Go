@@ -1,4 +1,4 @@
-package main
+package utils
 
 import (
 	"encoding/csv"
@@ -6,8 +6,8 @@ import (
 	"strings"
 )
 
-// getOwnerAndRepo liest eine CSV-Datei ein und gibt für jede Zeile owner und repo zurück
-func getOwnerAndRepo(filename string) ([][2]string, error) {
+// GetOwnerAndRepo liest eine CSV-Datei ein und gibt für jede Zeile owner und repo zurück
+func GetOwnerAndRepo(filename string) ([][2]string, error) {
 	file, err := os.Open(filename)
 	if err != nil {
 		return nil, err

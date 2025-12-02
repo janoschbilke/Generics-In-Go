@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"log"
 	"path/filepath"
+
+	utils "GoParser/utils"
 )
 
 func aggregateCounters(target *GenericCounters, source GenericCounters) {
@@ -47,7 +49,7 @@ func printCSVRow(name string, counters GenericCounters) {
 }
 
 func main() {
-	config, err := SetupEnvironment()
+	config, err := utils.SetupEnvironment()
 	if err != nil {
 		log.Fatalf("Failed to set up environment: %v", err)
 	}
@@ -59,7 +61,7 @@ func main() {
 		// === LOKALER MODUS ===
 		log.Printf("Running in LOCAL mode for project: %s", config.LocalProject)
 
-		files, err := fetchLocalGoFiles(config.LocalProject)
+		files, err := utils.FetchLocalGoFiles(config.LocalProject)
 		if err != nil {
 			log.Fatalf("Failed to load local files: %v", err)
 		}
@@ -91,13 +93,13 @@ func main() {
 	}
 
 	// === GITHUB MODUS (wie bisher) ===
-	entries, _ := getOwnerAndRepo(config.CSVPath)
+	entries, _ := utils.GetOwnerAndRepo(config.CSVPath)
 
 	// CSV-Header anpassen
 	fmt.Println("Repository,FuncTotal,FuncGeneric,MethodTotal,MethodWithGenericReceiver,StructTotal,StructGeneric,StructGenericNonTrivialBound,TypeDecl,GenericTypeDecl,GenericTypeSet")
 
 	for _, repository := range entries {
-		files, err := fetchGoFilesList(repository[0], repository[1], config.Token)
+		files, err := utils.FetchGoFilesList(repository[0], repository[1], config.Token)
 		if err != nil {
 			log.Println(err)
 		} else {
