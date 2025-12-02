@@ -29,7 +29,17 @@ type GenericCounters struct {
 	GenericTypeSet  int
 }
 
-func analyzeFile(src string) (GenericCounters, error) {
+type ASTAnalyzer interface {
+	AnalyzeFile(src string) (GenericCounters, error)
+}
+
+type astAnalyzerImpl struct{}
+
+func NewASTAnalyzer() ASTAnalyzer {
+	return &astAnalyzerImpl{}
+}
+
+func (a *astAnalyzerImpl) AnalyzeFile(src string) (GenericCounters, error) {
 	fset := token.NewFileSet()
 	file, err := parser.ParseFile(fset, "", src, parser.AllErrors)
 	if err != nil {

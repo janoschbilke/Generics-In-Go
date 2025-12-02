@@ -65,6 +65,8 @@ func main() {
 
 	counterOverEveryRepository := GenericCounters{}
 
+	astAnalyzer := NewASTAnalyzer()
+
 	// Prüfe ob lokaler Modus aktiviert ist
 	if config.LocalProject != "" {
 		// === LOKALER MODUS ===
@@ -83,7 +85,7 @@ func main() {
 		fmt.Println("Repository,FuncTotal,FuncGeneric,MethodTotal,MethodWithGenericReceiver,MethodWithGenericReceiverTrivialTypeBound,MethodWithGenericReceiverNonTrivialTypeBound,StructTotal,StructGeneric,StructGenericNonTrivialBound,StructAsTypeBound,TypeDecl,GenericTypeDecl,GenericTypeSet")
 
 		for _, file := range files {
-			counts, err := analyzeFile(file)
+			counts, err := astAnalyzer.AnalyzeFile(file)
 			if err != nil {
 				log.Println("Error:", err)
 			} else {
@@ -115,7 +117,7 @@ func main() {
 			countersForEntireRepo := GenericCounters{}
 
 			for _, file := range files {
-				counts, err := analyzeFile(file)
+				counts, err := astAnalyzer.AnalyzeFile(file)
 				if err != nil {
 					log.Println("Error:", err)
 				} else {
