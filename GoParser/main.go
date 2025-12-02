@@ -13,6 +13,8 @@ func aggregateCounters(target *GenericCounters, source GenericCounters) {
 	target.FuncGeneric += source.FuncGeneric
 	target.MethodTotal += source.MethodTotal
 	target.MethodWithGenericReceiver += source.MethodWithGenericReceiver
+	target.MethodWithGenericReceiverTrivialTypeBound += source.MethodWithGenericReceiverTrivialTypeBound
+	target.MethodWithGenericReceiverNonTrivialTypeBound += source.MethodWithGenericReceiverNonTrivialTypeBound
 	target.StructTotal += source.StructTotal
 	target.StructGeneric += source.StructGeneric
 	target.StructGenericBound += source.StructGenericBound
@@ -27,6 +29,8 @@ func printCountersSummary(counters GenericCounters, title string) {
 	fmt.Printf("%s:\n", title)
 	fmt.Printf("FuncGeneric: %v\n", counters.FuncGeneric)
 	fmt.Printf("MethodWithGenericReceiver: %v\n", counters.MethodWithGenericReceiver)
+	fmt.Printf("MethodWithGenericReceiverTrivialTypeBound: %v\n", counters.MethodWithGenericReceiverTrivialTypeBound)
+	fmt.Printf("MethodWithGenericReceiverNonTrivialTypeBound: %v\n", counters.MethodWithGenericReceiverNonTrivialTypeBound)
 	fmt.Printf("StructGeneric: %v\n", counters.StructGeneric)
 	fmt.Printf("StructGenericNonTrivialBound: %v\n", counters.StructGenericBound)
 	fmt.Printf("StructAsTypeBound: %v\n", counters.StructAsTypeBound)
@@ -35,12 +39,14 @@ func printCountersSummary(counters GenericCounters, title string) {
 }
 
 func printCSVRow(name string, counters GenericCounters) {
-	fmt.Printf("%s,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d\n",
+	fmt.Printf("%s,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d\n",
 		name,
 		counters.FuncTotal,
 		counters.FuncGeneric,
 		counters.MethodTotal,
 		counters.MethodWithGenericReceiver,
+		counters.MethodWithGenericReceiverTrivialTypeBound,
+		counters.MethodWithGenericReceiverNonTrivialTypeBound,
 		counters.StructTotal,
 		counters.StructGeneric,
 		counters.StructGenericBound,
@@ -59,6 +65,8 @@ func main() {
 
 	counterOverEveryRepository := GenericCounters{}
 
+	astAnalyzer := NewASTAnalyzer()
+
 	// Prüfe ob lokaler Modus aktiviert ist
 	if config.LocalProject != "" {
 		// === LOKALER MODUS ===
@@ -74,10 +82,10 @@ func main() {
 		countersForProject := GenericCounters{}
 
 		// CSV-Header ausgeben
-		fmt.Println("Repository,FuncTotal,FuncGeneric,MethodTotal,MethodWithGenericReceiver,StructTotal,StructGeneric,StructGenericNonTrivialBound,StructAsTypeBound,TypeDecl,GenericTypeDecl,GenericTypeSet")
+		fmt.Println("Repository,FuncTotal,FuncGeneric,MethodTotal,MethodWithGenericReceiver,MethodWithGenericReceiverTrivialTypeBound,MethodWithGenericReceiverNonTrivialTypeBound,StructTotal,StructGeneric,StructGenericNonTrivialBound,StructAsTypeBound,TypeDecl,GenericTypeDecl,GenericTypeSet")
 
 		for _, file := range files {
-			counts, err := analyzeFile(file)
+			counts, err := astAnalyzer.AnalyzeFile(file)
 			if err != nil {
 				log.Println("Error:", err)
 			} else {
@@ -99,7 +107,7 @@ func main() {
 	entries, _ := utils.GetOwnerAndRepo(config.CSVPath)
 
 	// CSV-Header anpassen
-	fmt.Println("Repository,FuncTotal,FuncGeneric,MethodTotal,MethodWithGenericReceiver,StructTotal,StructGeneric,StructGenericNonTrivialBound,StructAsTypeBound,TypeDecl,GenericTypeDecl,GenericTypeSet")
+	fmt.Println("Repository,FuncTotal,FuncGeneric,MethodTotal,MethodWithGenericReceiver,MethodWithGenericReceiverTrivialTypeBound,MethodWithGenericReceiverNonTrivialTypeBound,StructTotal,StructGeneric,StructGenericNonTrivialBound,StructAsTypeBound,TypeDecl,GenericTypeDecl,GenericTypeSet")
 
 	for _, repository := range entries {
 		files, err := utils.FetchGoFilesList(repository[0], repository[1], config.Token)
@@ -109,7 +117,7 @@ func main() {
 			countersForEntireRepo := GenericCounters{}
 
 			for _, file := range files {
-				counts, err := analyzeFile(file)
+				counts, err := astAnalyzer.AnalyzeFile(file)
 				if err != nil {
 					log.Println("Error:", err)
 				} else {

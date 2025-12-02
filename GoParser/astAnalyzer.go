@@ -12,14 +12,16 @@ type GenericCounters struct {
 	FuncGeneric int
 
 	// Methoden
-	MethodTotal               int
-	MethodWithGenericReceiver int
+	MethodTotal                                 int
+	MethodWithGenericReceiver                   int
+	MethodWithGenericReceiverTrivialTypeBound   int // Erweiterung 3
+	MethodWithGenericReceiverNonTrivialTypeBound int // Erweiterung 3
 
 	// Structs
 	StructTotal              int
 	StructGeneric            int
 	StructGenericBound       int
-	StructAsTypeBound        int 
+	StructAsTypeBound        int // Erweiterung 2
 
 	// Sonstiges
 	TypeDecl        int
@@ -27,13 +29,95 @@ type GenericCounters struct {
 	GenericTypeSet  int
 }
 
-func analyzeFile(src string) (GenericCounters, error) {
+type ASTAnalyzer interface {
+	AnalyzeFile(src string) (GenericCounters, error)
+}
+
+type astAnalyzerImpl struct{}
+
+func NewASTAnalyzer() ASTAnalyzer {
+	return &astAnalyzerImpl{}
+}
+
+func (a *astAnalyzerImpl) AnalyzeFile(src string) (GenericCounters, error) {
 	fset := token.NewFileSet()
 	file, err := parser.ParseFile(fset, "", src, parser.AllErrors)
 	if err != nil {
 		return GenericCounters{}, err
 	}
 
+	// First pass: collect type bounds information (for Erweiterung 2 & 3)
+	typeBoundsInfo := collectTypeBoundsInfo(file)
+
+	// Second pass: analyze file with information about type bounds available
+	counters, err := analyzeASTAndGetCounters(file, typeBoundsInfo)
+	if err != nil {
+		return GenericCounters{}, err
+	}
+
+	return counters, nil
+}
+
+// TypeBoundInfo stores information about a type's bounds
+type TypeBoundInfo struct {
+	hasNonTrivialBound bool
+	hasStructBound     bool // Erweiterung 2: tracks if any bound is a struct
+}
+
+func collectTypeBoundsInfo(file *ast.File) map[string]TypeBoundInfo {
+	typeBoundsInfo := make(map[string]TypeBoundInfo)
+
+	ast.Inspect(file, func(n ast.Node) bool {
+		if typeSpec, ok := n.(*ast.TypeSpec); ok {
+			if typeSpec.TypeParams != nil && len(typeSpec.TypeParams.List) > 0 {
+				info := TypeBoundInfo{}
+				
+				for _, tp := range typeSpec.TypeParams.List {
+					if tp.Type != nil {
+						isTrivial := false
+
+						// Check for "any"
+						if ident, ok := tp.Type.(*ast.Ident); ok && ident.Name == "any" {
+							isTrivial = true
+						}
+
+						// Check for empty interface{}
+						if iface, ok := tp.Type.(*ast.InterfaceType); ok && iface.Methods != nil && iface.Methods.NumFields() == 0 {
+							isTrivial = true
+						}
+
+						// Check if constraint is an empty interface or struct defined elsewhere
+						if ident, ok := tp.Type.(*ast.Ident); ok {
+							obj := ident.Obj
+							if obj != nil {
+								if ts, ok := obj.Decl.(*ast.TypeSpec); ok {
+									// Erweiterung 1: Check if constraint is an empty interface
+									if iface, ok := ts.Type.(*ast.InterfaceType); ok && iface.Methods != nil && iface.Methods.NumFields() == 0 {
+										isTrivial = true
+									}
+									// Erweiterung 2: Check if constraint is a struct type
+									if _, ok := ts.Type.(*ast.StructType); ok {
+										info.hasStructBound = true
+									}
+								}
+							}
+						}
+
+						if !isTrivial {
+							info.hasNonTrivialBound = true
+						}
+					}
+				}
+				typeBoundsInfo[typeSpec.Name.Name] = info
+			}
+		}
+		return true
+	})
+
+	return typeBoundsInfo
+}
+
+func analyzeASTAndGetCounters(file *ast.File, typeBoundsInfo map[string]TypeBoundInfo) (GenericCounters, error) {
 	counters := GenericCounters{}
 
 	ast.Inspect(file, func(n ast.Node) bool {
@@ -62,10 +146,32 @@ func analyzeFile(src string) (GenericCounters, error) {
 
 					// 3. Nun prüfen, ob der Typ des Receivers generisch ist.
 					// Ein generischer Typ wird im AST als *ast.IndexExpr (für einen Typparameter) oder *ast.IndexListExpr (für mehrere) dargestellt.
-					if _, ok := receiverType.(*ast.IndexExpr); ok {
+					isGenericReceiver := false
+					var receiverTypeName string
+
+					if indexExpr, ok := receiverType.(*ast.IndexExpr); ok {
+						isGenericReceiver = true
+						if ident, ok := indexExpr.X.(*ast.Ident); ok {
+							receiverTypeName = ident.Name
+						}
+					} else if indexListExpr, ok := receiverType.(*ast.IndexListExpr); ok {
+						isGenericReceiver = true
+						if ident, ok := indexListExpr.X.(*ast.Ident); ok {
+							receiverTypeName = ident.Name
+						}
+					}
+
+					if isGenericReceiver {
 						counters.MethodWithGenericReceiver++
-					} else if _, ok := receiverType.(*ast.IndexListExpr); ok {
-						counters.MethodWithGenericReceiver++
+
+						// Erweiterung 3: Check if receiver type has non-trivial bound
+						if info, exists := typeBoundsInfo[receiverTypeName]; exists {
+							if info.hasNonTrivialBound {
+								counters.MethodWithGenericReceiverNonTrivialTypeBound++
+							} else {
+								counters.MethodWithGenericReceiverTrivialTypeBound++
+							}
+						}
 					}
 				}
 			}
@@ -82,52 +188,17 @@ func analyzeFile(src string) (GenericCounters, error) {
 				counters.StructTotal++
 				if node.TypeParams != nil && len(node.TypeParams.List) > 0 {
 					counters.StructGeneric++
-					// prüfen, ob Constraints != "any" vorkommen
-					for _, tp := range node.TypeParams.List {
-						if tp.Type != nil {
-							isTrivialConstraint := false
-							isStructConstraint := false
-
-							// Check for "any"
-							if ident, ok := tp.Type.(*ast.Ident); ok && ident.Name == "any" {
-								isTrivialConstraint = true
-							}
-
-							// Check for empty interface{}
-							if iface, ok := tp.Type.(*ast.InterfaceType); ok && iface.Methods != nil && iface.Methods.NumFields() == 0 {
-								isTrivialConstraint = true
-							}
-
-							// Semantic Check: Is the constrant an empty interface defined elsewhere?
-							// E.g. type MyInterface interface{}
-							// type Foo3[T MyInterface] struct {
-							// 		val T
-							// }
-							if ident, ok := tp.Type.(*ast.Ident); ok {
-								obj := ident.Obj
-								if obj != nil {
-									if ts, ok := obj.Decl.(*ast.TypeSpec); ok {
-										if iface, ok := ts.Type.(*ast.InterfaceType); ok && iface.Methods != nil && iface.Methods.NumFields() == 0 {
-											isTrivialConstraint = true
-										}
-										// Erweiterung 2: Check if constraint is a struct type
-										// E.g. type FF struct{}
-										// type Foo4[T FF] struct { val T }
-										if _, ok := ts.Type.(*ast.StructType); ok {
-											isStructConstraint = true
-										}
-									}
-								}
-							}
-
-							if isStructConstraint {
-								counters.StructAsTypeBound++
-							}
-
-							if !isTrivialConstraint {
-								counters.StructGenericBound++
-								break
-							}
+					
+					// Use collected type bounds info from first pass
+					if info, exists := typeBoundsInfo[node.Name.Name]; exists {
+						// Erweiterung 1: Count structs with non-trivial bounds
+						if info.hasNonTrivialBound {
+							counters.StructGenericBound++
+						}
+						
+						// Erweiterung 2: Count structs that have a struct as type bound
+						if info.hasStructBound {
+							counters.StructAsTypeBound++
 						}
 					}
 				}
