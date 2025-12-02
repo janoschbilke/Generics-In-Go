@@ -1,6 +1,8 @@
 package main
 
 import (
+	"GoParser/database"
+	"GoParser/model"
 	"fmt"
 	"log"
 	"path/filepath"
@@ -8,7 +10,7 @@ import (
 	utils "GoParser/utils"
 )
 
-func aggregateCounters(target *GenericCounters, source GenericCounters) {
+func aggregateCounters(target *model.GenericCounters, source model.GenericCounters) {
 	target.FuncTotal += source.FuncTotal
 	target.FuncGeneric += source.FuncGeneric
 	target.MethodTotal += source.MethodTotal
@@ -24,7 +26,7 @@ func aggregateCounters(target *GenericCounters, source GenericCounters) {
 	target.GenericTypeSet += source.GenericTypeSet
 }
 
-func printCountersSummary(counters GenericCounters, title string) {
+func printCountersSummary(counters model.GenericCounters, title string) {
 	fmt.Println()
 	fmt.Printf("%s:\n", title)
 	fmt.Printf("FuncGeneric: %v\n", counters.FuncGeneric)
@@ -38,7 +40,7 @@ func printCountersSummary(counters GenericCounters, title string) {
 	fmt.Printf("GenericTypeSet: %v\n", counters.GenericTypeSet)
 }
 
-func printCSVRow(name string, counters GenericCounters) {
+func printCSVRow(name string, counters model.GenericCounters) {
 	fmt.Printf("%s,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d\n",
 		name,
 		counters.FuncTotal,
@@ -63,7 +65,19 @@ func main() {
 		log.Fatalf("Failed to set up environment: %v", err)
 	}
 
-	counterOverEveryRepository := GenericCounters{}
+	counterOverEveryRepository := model.GenericCounters{}
+
+	// Datenbank erstellen
+	sqliteDB, err := database.NewSQLiteDB("generic_counters.db", utils.GetColumns())
+	if err != nil {
+		log.Fatalf("Failed to create database: %v", err)
+	}
+
+	defer func() {
+		if err := sqliteDB.Close(); err != nil {
+			log.Fatalf("Failed to close database: %v", err)
+		}
+	}()
 
 	astAnalyzer := NewASTAnalyzer()
 
@@ -79,7 +93,7 @@ func main() {
 
 		log.Printf("Found %d .go files in local project", len(files))
 
-		countersForProject := GenericCounters{}
+		countersForProject := model.GenericCounters{}
 
 		// CSV-Header ausgeben
 		fmt.Println("Repository,FuncTotal,FuncGeneric,MethodTotal,MethodWithGenericReceiver,MethodWithGenericReceiverTrivialTypeBound,MethodWithGenericReceiverNonTrivialTypeBound,StructTotal,StructGeneric,StructGenericNonTrivialBound,StructAsTypeBound,TypeDecl,GenericTypeDecl,GenericTypeSet")
@@ -97,6 +111,11 @@ func main() {
 		projectName := "local/" + filepath.Base(config.LocalProject)
 		printCSVRow(projectName, countersForProject)
 
+		// In Datenbank speichern
+		if err := sqliteDB.AddGenericCountersEntry(projectName, countersForProject); err != nil {
+			log.Fatalf("Failed to add entry to database: %v", err)
+		}
+
 		// Gesamt-Statistik
 		printCountersSummary(countersForProject, "Counter for local project")
 
@@ -104,7 +123,10 @@ func main() {
 	}
 
 	// === GITHUB MODUS (wie bisher) ===
-	entries, _ := utils.GetOwnerAndRepo(config.CSVPath)
+	entries, err := utils.GetOwnerAndRepo(config.CSVPath)
+	if err != nil {
+		log.Fatalf("Failed to read CSV file: %v", err)
+	}
 
 	// CSV-Header anpassen
 	fmt.Println("Repository,FuncTotal,FuncGeneric,MethodTotal,MethodWithGenericReceiver,MethodWithGenericReceiverTrivialTypeBound,MethodWithGenericReceiverNonTrivialTypeBound,StructTotal,StructGeneric,StructGenericNonTrivialBound,StructAsTypeBound,TypeDecl,GenericTypeDecl,GenericTypeSet")
@@ -114,7 +136,7 @@ func main() {
 		if err != nil {
 			log.Println(err)
 		} else {
-			countersForEntireRepo := GenericCounters{}
+			countersForEntireRepo := model.GenericCounters{}
 
 			for _, file := range files {
 				counts, err := astAnalyzer.AnalyzeFile(file)
@@ -150,6 +172,11 @@ func main() {
 			// CSV-Ausgabe pro Repo
 			repoName := repository[0] + "/" + repository[1]
 			printCSVRow(repoName, countersForEntireRepo)
+
+			// In Datenbank speichern
+			if err := sqliteDB.AddGenericCountersEntry(repoName, countersForEntireRepo); err != nil {
+				log.Fatalf("Failed to add entry to database: %v", err)
+			}
 		}
 	}
 

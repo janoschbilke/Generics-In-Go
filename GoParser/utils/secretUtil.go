@@ -3,6 +3,7 @@ package utils
 import (
 	"bufio"
 	"fmt"
+	"log"
 	"os"
 	"strings"
 )
@@ -18,7 +19,12 @@ func SetupEnvironment() (SetupConfiguration, error) {
 
 	secretsPath := os.Getenv("GOPARSER_SECRETS_PATH")
 	if secretsPath == "" {
-		secretsPath = "secret.env"
+		dir, err := os.Getwd()
+		if err != nil {
+			secretsPath = "secret.env"
+		} else {
+			secretsPath = fmt.Sprintf("%s/secret.env", dir)
+		}
 	}
 
 	if err := loadEnvFile(secretsPath); err != nil {
@@ -36,7 +42,12 @@ func SetupEnvironment() (SetupConfiguration, error) {
 
 	csvPath := os.Getenv("CSV_PATH")
 	if csvPath == "" {
-		csvPath = "../input/alleSourcegraph.csv"
+		dir, err := os.Getwd()
+		if err != nil {
+			// Wenn ein Fehler auftritt, loggen Sie ihn und beenden Sie das Programm
+			log.Fatal(err)
+		}
+		csvPath = fmt.Sprintf("%s/input/alleSourcegraph.csv", dir)
 	}
 
 	config.Token = token
