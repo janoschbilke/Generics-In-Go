@@ -10,7 +10,7 @@ type SimpleGenericWithEmptyInterface[T interface{}] struct {
 	_ T
 }
 
-// Erweiterung: Definition von leeren Interfaces muss auch als trivial gelten
+// Erweiterung 1: Definition von leeren Interfaces muss auch als trivial gelten
 type EmptyInterface interface{}
 
 type AnotherEmptyInterface interface{}

@@ -16,9 +16,10 @@ type GenericCounters struct {
 	MethodWithGenericReceiver int
 
 	// Structs
-	StructTotal        int
-	StructGeneric      int
-	StructGenericBound int
+	StructTotal              int
+	StructGeneric            int
+	StructGenericBound       int
+	StructAsTypeBound        int 
 
 	// Sonstiges
 	TypeDecl        int
@@ -85,6 +86,7 @@ func analyzeFile(src string) (GenericCounters, error) {
 					for _, tp := range node.TypeParams.List {
 						if tp.Type != nil {
 							isTrivialConstraint := false
+							isStructConstraint := false
 
 							// Check for "any"
 							if ident, ok := tp.Type.(*ast.Ident); ok && ident.Name == "any" {
@@ -108,8 +110,18 @@ func analyzeFile(src string) (GenericCounters, error) {
 										if iface, ok := ts.Type.(*ast.InterfaceType); ok && iface.Methods != nil && iface.Methods.NumFields() == 0 {
 											isTrivialConstraint = true
 										}
+										// Erweiterung 2: Check if constraint is a struct type
+										// E.g. type FF struct{}
+										// type Foo4[T FF] struct { val T }
+										if _, ok := ts.Type.(*ast.StructType); ok {
+											isStructConstraint = true
+										}
 									}
 								}
+							}
+
+							if isStructConstraint {
+								counters.StructAsTypeBound++
 							}
 
 							if !isTrivialConstraint {
