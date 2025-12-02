@@ -21,14 +21,18 @@ Default Wert für den CSV_PATH ist `../input/alleSourcegraph.csv`.
 
 ### Bereitstellung durch eine Secret-Datei
 
-Die Werte können auch in einer *.env-Datei hinterlegt werden..
-Um die Datei bereitzustellen, muss vor dem Ausführen der Pfad zur Datei entweder über
+Die Werte können auch in einer *.env-Datei hinterlegt werden.
+Standardmäßig wird die Datei `./secrets.env` im Project verwendet.
+
+Es kann alternativ ein eigener Pfad zur Datei angegeben werden.
+Dies geht auf zwei Arten:
+Entweder kann vor dem Ausführen der Pfad zur Datei über eine Environment-Variable gesetzt werden:
 
 ```bash
 export GOPARSER_SECRETS_PATH=./Pfad/zu/der/Datei
 ```
 
-oder über die launch-Konfiguration von VSC oder GoLand konfiguriert.
+oder über die launch-Konfiguration von VSC konfiguriert werden.
 In VSC sieht die Launch-Konfiguration dann beispielsweise so aus:
 
 ```json

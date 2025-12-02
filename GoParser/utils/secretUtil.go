@@ -17,10 +17,12 @@ func SetupEnvironment() (SetupConfiguration, error) {
 	config := SetupConfiguration{}
 
 	secretsPath := os.Getenv("GOPARSER_SECRETS_PATH")
-	if secretsPath != "" {
-		if err := loadEnvFile(secretsPath); err != nil {
-			return SetupConfiguration{}, fmt.Errorf("failed to load secrets from %s: %w", secretsPath, err)
-		}
+	if secretsPath == "" {
+		secretsPath = "secret.env"
+	}
+
+	if err := loadEnvFile(secretsPath); err != nil {
+		return SetupConfiguration{}, fmt.Errorf("failed to load secrets from %s: %w", secretsPath, err)
 	}
 
 	// Prüfe zuerst ob lokaler Modus aktiviert ist
