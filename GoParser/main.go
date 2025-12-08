@@ -68,7 +68,7 @@ func main() {
 	counterOverEveryRepository := model.GenericCounters{}
 
 	// Datenbank erstellen
-	sqliteDB, err := database.NewSQLiteDB("generic_counters.db", utils.GetColumns())
+	sqliteDB, err := database.NewSQLiteDB("generic_counters.db")
 	if err != nil {
 		log.Fatalf("Failed to create database: %v", err)
 	}
@@ -112,7 +112,8 @@ func main() {
 		printCSVRow(projectName, countersForProject)
 
 		// In Datenbank speichern
-		if err := sqliteDB.AddGenericCountersEntry(projectName, countersForProject); err != nil {
+		countersForProject.Repository = projectName
+		if err := sqliteDB.AddGenericCountersEntry(countersForProject); err != nil {
 			log.Fatalf("Failed to add entry to database: %v", err)
 		}
 
@@ -174,7 +175,8 @@ func main() {
 			printCSVRow(repoName, countersForEntireRepo)
 
 			// In Datenbank speichern
-			if err := sqliteDB.AddGenericCountersEntry(repoName, countersForEntireRepo); err != nil {
+			countersForEntireRepo.Repository = repoName
+			if err := sqliteDB.AddGenericCountersEntry(countersForEntireRepo); err != nil {
 				log.Fatalf("Failed to add entry to database: %v", err)
 			}
 		}
