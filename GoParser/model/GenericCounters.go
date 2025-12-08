@@ -1,24 +1,25 @@
 package model
 
+// GenericCounters represents counters for generics analysis, now with only the primary key GORM tag.
 type GenericCounters struct {
-	// Funktionen
-	FuncTotal   int `json:"func_total"`
-	FuncGeneric int `json:"func_generic"`
+	Repository  string `gorm:"primaryKey"`
+	FuncTotal   int
+	FuncGeneric int
 
 	// Methoden
-	MethodTotal                                  int `json:"method_total"`
-	MethodWithGenericReceiver                    int `json:"method_with_generic_receiver"`
-	MethodWithGenericReceiverTrivialTypeBound    int `json:"method_with_generic_receiver_trivial_type_bound"`     // Erweiterung 3
-	MethodWithGenericReceiverNonTrivialTypeBound int `json:"method_with_generic_receiver_non_trivial_type_bound"` // Erweiterung 3
+	MethodTotal                                  int
+	MethodWithGenericReceiver                    int
+	MethodWithGenericReceiverTrivialTypeBound    int // Erweiterung 3
+	MethodWithGenericReceiverNonTrivialTypeBound int // Erweiterung 3
 
 	// Structs
-	StructTotal        int `json:"struct_total"`
-	StructGeneric      int `json:"struct_generic"`
-	StructGenericBound int `json:"struct_generic_bound"`
-	StructAsTypeBound  int `json:"struct_as_type_bound"` // Erweiterung 2
+	StructTotal        int
+	StructGeneric      int
+	StructGenericBound int
+	StructAsTypeBound  int // Erweiterung 2
 
 	// Sonstiges
-	TypeDecl        int `json:"type_decl"`
-	GenericTypeDecl int `json:"generic_type_decl"`
-	GenericTypeSet  int `json:"generic_type_set"`
+	TypeDecl        int
+	GenericTypeDecl int
+	GenericTypeSet  int
 }
