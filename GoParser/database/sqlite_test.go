@@ -13,7 +13,7 @@ func TestAddGenericCountersEntries(t *testing.T) {
 		columns = append(columns, typeOfCounters.Field(i).Tag.Get("json"))
 	}
 
-	db, err := NewSQLiteDB("test.db", columns)
+	db, err := NewSQLiteDB("test.db")
 	if err != nil {
 		t.Fatalf("failed to create db: %v", err)
 	}
@@ -38,10 +38,10 @@ func TestAddGenericCountersEntries(t *testing.T) {
 	}
 	entry2 := model.GenericCounters{}
 
-	if err := db.AddGenericCountersEntry("repo1", entry1); err != nil {
+	if err := db.AddGenericCountersEntry(entry1); err != nil {
 		t.Errorf("failed to add entry1: %v", err)
 	}
-	if err := db.AddGenericCountersEntry("repo2", entry2); err != nil {
+	if err := db.AddGenericCountersEntry(entry2); err != nil {
 		t.Errorf("failed to add entry2: %v", err)
 	}
 }
