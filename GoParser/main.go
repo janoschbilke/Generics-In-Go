@@ -25,15 +25,10 @@ func aggregateCounters(target *model.GenericCounters, source model.GenericCounte
 	target.GenericTypeDecl += source.GenericTypeDecl
 	target.GenericTypeSet += source.GenericTypeSet
 	
-	// Erweiterung 4: Aggregate instantiation counters
 	target.GenericFuncInstantiationExplicit += source.GenericFuncInstantiationExplicit
 	target.GenericFuncInstantiationInferred += source.GenericFuncInstantiationInferred
-	target.GenericFuncInstantiationExternalExplicit += source.GenericFuncInstantiationExternalExplicit
-	target.GenericFuncInstantiationExternalInferred += source.GenericFuncInstantiationExternalInferred
 	target.GenericTypeInstantiationExplicit += source.GenericTypeInstantiationExplicit
 	target.GenericTypeInstantiationInferred += source.GenericTypeInstantiationInferred
-	target.GenericTypeInstantiationExternalExplicit += source.GenericTypeInstantiationExternalExplicit
-	target.GenericTypeInstantiationExternalInferred += source.GenericTypeInstantiationExternalInferred
 }
 
 func printCountersSummary(counters model.GenericCounters, title string) {
@@ -49,20 +44,13 @@ func printCountersSummary(counters model.GenericCounters, title string) {
 	fmt.Printf("GenericTypeDecl: %v\n", counters.GenericTypeDecl)
 	fmt.Printf("GenericTypeSet: %v\n", counters.GenericTypeSet)
 	
-	// Erweiterung 4: Print instantiation counters if any
 	if counters.GenericFuncInstantiationExplicit > 0 || counters.GenericFuncInstantiationInferred > 0 ||
-		counters.GenericFuncInstantiationExternalExplicit > 0 || counters.GenericFuncInstantiationExternalInferred > 0 ||
-		counters.GenericTypeInstantiationExplicit > 0 || counters.GenericTypeInstantiationInferred > 0 ||
-		counters.GenericTypeInstantiationExternalExplicit > 0 || counters.GenericTypeInstantiationExternalInferred > 0 {
-		fmt.Println("\nErweiterung 4 - Generic Instantiations:")
+		counters.GenericTypeInstantiationExplicit > 0 || counters.GenericTypeInstantiationInferred > 0 {
+		fmt.Println("\nGeneric Instantiations:")
 		fmt.Printf("  GenericFuncInstantiationExplicit: %v\n", counters.GenericFuncInstantiationExplicit)
 		fmt.Printf("  GenericFuncInstantiationInferred: %v\n", counters.GenericFuncInstantiationInferred)
-		fmt.Printf("  GenericFuncInstantiationExternalExplicit: %v\n", counters.GenericFuncInstantiationExternalExplicit)
-		fmt.Printf("  GenericFuncInstantiationExternalInferred: %v\n", counters.GenericFuncInstantiationExternalInferred)
 		fmt.Printf("  GenericTypeInstantiationExplicit: %v\n", counters.GenericTypeInstantiationExplicit)
 		fmt.Printf("  GenericTypeInstantiationInferred: %v\n", counters.GenericTypeInstantiationInferred)
-		fmt.Printf("  GenericTypeInstantiationExternalExplicit: %v\n", counters.GenericTypeInstantiationExternalExplicit)
-		fmt.Printf("  GenericTypeInstantiationExternalInferred: %v\n", counters.GenericTypeInstantiationExternalInferred)
 	}
 }
 

@@ -7,7 +7,7 @@ Diese Dokumentation beschreibt alle analysierten Metriken und wie sie ermittelt 
 Der AST-Analyzer zählt folgende Metriken in Go-Projekten:
 
 | Metrik | Beschreibung |
-|--------|--------------|
+| -------- | -------------- |
 | FuncTotal | Gesamtanzahl aller Funktionen |
 | FuncGeneric | Anzahl generischer Funktionen |
 | MethodTotal | Gesamtanzahl aller Methoden |
@@ -374,15 +374,18 @@ Die Erkennung erfolgt durch:
 ### Erweiterung 4: Generic Function/Method Instantiations
 
 **Problem**: Die Verwendung von generischen Funktionen und Methoden kann auf zwei Arten erfolgen:
+
 1. **Explizit**: `f[int](1)` - Typ ist direkt im Code sichtbar
 2. **Inferiert**: `f(2)` - Typ wird durch Type Inference ermittelt
 
 Für eine vollständige Analyse ist es wichtig zu verstehen:
+
 - Wie oft werden Generics tatsächlich verwendet?
 - Werden Type-Parameter explizit angegeben oder inferriert?
 - Werden lokale oder externe generische Funktionen/Methoden verwendet?
 
 **Lösung**: Kombinierter Ansatz mit AST + go/types:
+
 1. **AST-basierte Erkennung** für explizite Instanziierungen (`f[int](x)`)
 2. **go/types Analyse** für inferrierte Instanziierungen (`f(x)`)
 3. **Unterscheidung lokal vs. extern** für bessere Einordnung
@@ -390,6 +393,7 @@ Für eine vollständige Analyse ist es wichtig zu verstehen:
 **Technische Umsetzung**:
 
 **Phase 1 - Lokale Generics sammeln:**
+
 ```go
 // Sammelt alle generischen Funktionen/Methoden im aktuellen File
 localGenerics := collectLocalGenerics(file)
@@ -397,6 +401,7 @@ localGenerics := collectLocalGenerics(file)
 ```
 
 **Phase 2 - Explizite Instanziierungen (AST):**
+
 ```go
 // Erkennt: f[int](x) oder obj.m[int](x)
 // CallExpr.Fun ist IndexExpr oder IndexListExpr
@@ -406,6 +411,7 @@ if indexExpr, ok := callExpr.Fun.(*ast.IndexExpr); ok {
 ```
 
 **Phase 3 - Inferrierte Instanziierungen (go/types):**
+
 ```go
 // Setup Type Checker
 info := &types.Info{
@@ -420,7 +426,7 @@ if _, hasInstance := info.Instances[ident]; hasInstance {
 **Metriken**:
 
 | Metrik | Beschreibung |
-|--------|--------------|
+| -------- | -------------- |
 | GenericFuncInstantiationExplicit | `f[int](x)` - lokale Funktionen |
 | GenericFuncInstantiationInferred | `f(x)` - lokale Funktionen mit Type Inference |
 | GenericFuncInstantiationExternalExplicit | `pkg.F[int](x)` - externe Funktionen |
@@ -476,11 +482,13 @@ func testTypes() {
 ```
 
 **Feature Flag**:
+
 - Die Analyse ist **opt-in** via `ENABLE_TYPE_INFERENCE=true`
 - Grund: go/types Analyse kann langsam sein bei großen Projekten
 - Default: disabled für bessere Performance
 
 **Impact**:
+
 - Verständnis der tatsächlichen Generic-Nutzung in der Praxis
 - Identifikation von Patterns: Werden Typen explizit angegeben oder inferriert?
 - Unterscheidung zwischen lokaler und externer Generic-Verwendung

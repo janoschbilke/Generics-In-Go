@@ -3,10 +3,12 @@
 ## Überblick
 
 Erweiterung 4 ermöglicht die Analyse von Generic Instantiations in Go-Code. Es werden zwei Arten von Instantiations gezählt:
+
 1. **Generic Functions**: `f[int](x)` oder `f(x)`
 2. **Generic Types**: `Box[int]{}` oder `Box{}`
 
 Jeweils unterschieden nach:
+
 - **Explizit** vs. **Inferiert** (mit/ohne eckige Klammern)
 - **Lokal** vs. **Extern** (im aktuellen Package vs. importiert)
 
@@ -22,10 +24,11 @@ GOPARSER_SECRETS_PATH=../secret.env LOCAL_PROJECT_PATH=../LocalTestProject go ru
 ```
 
 **Erkannt werden:**
-- ✅ `f[int](x)` - explizite Function Instantiation
-- ✅ `Box[int]{}` - explizite Type Instantiation
-- ❌ `f(x)` - wird NICHT gezählt (benötigt Type Inference)
-- ❌ `Box{value: 1}` - wird NICHT gezählt (benötigt Type Inference)
+
+- `f[int](x)` - explizite Function Instantiation
+- `Box[int]{}` - explizite Type Instantiation
+- `f(x)` - wird nicht gezählt (benötigt Type Inference)
+- `Box{value: 1}` - wird nicht gezählt (benötigt Type Inference)
 
 ### Vollständige Analyse (inkl. Type Inference)
 
@@ -40,6 +43,7 @@ go run .
 ```
 
 **Erkannt werden:**
+
 - ✅ `f[int](x)` - explizite Function Instantiation
 - ✅ `Box[int]{}` - explizite Type Instantiation
 - ✅ `f(x)` - inferrierte Function Instantiation
@@ -69,7 +73,7 @@ ENABLE_TYPE_INFERENCE=true
 
 ### Beispiel-Output
 
-```
+```text
 Erweiterung 4 - Generic Instantiations:
   GenericFuncInstantiationExplicit: 4          # f[int](x) - lokal
   GenericFuncInstantiationInferred: 4          # f(x) - lokal
@@ -91,11 +95,13 @@ Erweiterung 4 - Generic Instantiations:
 ## Performance-Hinweis
 
 **Type Inference Analyse ist langsamer**, weil:
+
 1. Vollständiges Type Checking mit `go/types` durchgeführt wird
 2. Alle Abhängigkeiten aufgelöst werden müssen
 3. Semantische Analyse statt nur syntaktischer Analyse
 
 **Empfehlung**:
+
 - Für große Projekte: `ENABLE_TYPE_INFERENCE=false` (default)
 - Für detaillierte Analyse: `ENABLE_TYPE_INFERENCE=true`
 
@@ -104,11 +110,11 @@ Erweiterung 4 - Generic Instantiations:
 In Go können **Methoden selbst keine Type Parameters haben**. Nur der Receiver-Typ kann generisch sein:
 
 ```go
-// ✅ ERLAUBT: Generischer Receiver
+// ERLAUBT: Generischer Receiver
 type Box[T any] struct { value T }
 func (b Box[T]) Get() T { return b.value }
 
-// ❌ NICHT ERLAUBT: Generische Methode
+// NICHT ERLAUBT: Generische Methode
 type Box struct { value int }
 func (b Box) Get[T any]() T { ... }  // COMPILER ERROR
 ```
