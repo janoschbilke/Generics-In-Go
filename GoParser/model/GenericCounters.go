@@ -22,4 +22,10 @@ type GenericCounters struct {
 	TypeDecl        int
 	GenericTypeDecl int
 	GenericTypeSet  int
+
+	GenericFuncInstantiationExplicit int
+	GenericFuncInstantiationInferred int
+
+	GenericTypeInstantiationExplicit int
+	GenericTypeInstantiationInferred int
 }

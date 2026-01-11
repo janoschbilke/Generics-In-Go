@@ -24,6 +24,11 @@ func aggregateCounters(target *model.GenericCounters, source model.GenericCounte
 	target.TypeDecl += source.TypeDecl
 	target.GenericTypeDecl += source.GenericTypeDecl
 	target.GenericTypeSet += source.GenericTypeSet
+	
+	target.GenericFuncInstantiationExplicit += source.GenericFuncInstantiationExplicit
+	target.GenericFuncInstantiationInferred += source.GenericFuncInstantiationInferred
+	target.GenericTypeInstantiationExplicit += source.GenericTypeInstantiationExplicit
+	target.GenericTypeInstantiationInferred += source.GenericTypeInstantiationInferred
 }
 
 func printCountersSummary(counters model.GenericCounters, title string) {
@@ -38,6 +43,15 @@ func printCountersSummary(counters model.GenericCounters, title string) {
 	fmt.Printf("StructAsTypeBound: %v\n", counters.StructAsTypeBound)
 	fmt.Printf("GenericTypeDecl: %v\n", counters.GenericTypeDecl)
 	fmt.Printf("GenericTypeSet: %v\n", counters.GenericTypeSet)
+	
+	if counters.GenericFuncInstantiationExplicit > 0 || counters.GenericFuncInstantiationInferred > 0 ||
+		counters.GenericTypeInstantiationExplicit > 0 || counters.GenericTypeInstantiationInferred > 0 {
+		fmt.Println("\nGeneric Instantiations:")
+		fmt.Printf("  GenericFuncInstantiationExplicit: %v\n", counters.GenericFuncInstantiationExplicit)
+		fmt.Printf("  GenericFuncInstantiationInferred: %v\n", counters.GenericFuncInstantiationInferred)
+		fmt.Printf("  GenericTypeInstantiationExplicit: %v\n", counters.GenericTypeInstantiationExplicit)
+		fmt.Printf("  GenericTypeInstantiationInferred: %v\n", counters.GenericTypeInstantiationInferred)
+	}
 }
 
 func printCSVRow(name string, counters model.GenericCounters) {
@@ -81,6 +95,13 @@ func main() {
 
 	astAnalyzer := NewASTAnalyzer()
 
+	// Log if type inference is enabled
+	if config.EnableTypeInference {
+		log.Printf("Type inference analysis ENABLED (Erweiterung 4)")
+	} else {
+		log.Printf("Type inference analysis DISABLED (use ENABLE_TYPE_INFERENCE=true to enable)")
+	}
+
 	// Prüfe ob lokaler Modus aktiviert ist
 	if config.LocalProject != "" {
 		// === LOKALER MODUS ===
@@ -99,7 +120,7 @@ func main() {
 		fmt.Println("Repository,FuncTotal,FuncGeneric,MethodTotal,MethodWithGenericReceiver,MethodWithGenericReceiverTrivialTypeBound,MethodWithGenericReceiverNonTrivialTypeBound,StructTotal,StructGeneric,StructGenericNonTrivialBound,StructAsTypeBound,TypeDecl,GenericTypeDecl,GenericTypeSet")
 
 		for _, file := range files {
-			counts, err := astAnalyzer.AnalyzeFile(file)
+			counts, err := astAnalyzer.AnalyzeFileWithConfig(file, config.EnableTypeInference)
 			if err != nil {
 				log.Println("Error:", err)
 			} else {
@@ -140,7 +161,7 @@ func main() {
 			countersForEntireRepo := model.GenericCounters{}
 
 			for _, file := range files {
-				counts, err := astAnalyzer.AnalyzeFile(file)
+				counts, err := astAnalyzer.AnalyzeFileWithConfig(file, config.EnableTypeInference)
 				if err != nil {
 					log.Println("Error:", err)
 				} else {

@@ -7,7 +7,7 @@ Diese Dokumentation beschreibt alle analysierten Metriken und wie sie ermittelt 
 Der AST-Analyzer zählt folgende Metriken in Go-Projekten:
 
 | Metrik | Beschreibung |
-|--------|--------------|
+| -------- | -------------- |
 | FuncTotal | Gesamtanzahl aller Funktionen |
 | FuncGeneric | Anzahl generischer Funktionen |
 | MethodTotal | Gesamtanzahl aller Methoden |
@@ -21,6 +21,15 @@ Der AST-Analyzer zählt folgende Metriken in Go-Projekten:
 | TypeDecl | Gesamtanzahl aller Type-Deklarationen |
 | GenericTypeDecl | Anzahl generischer Type-Deklarationen |
 | GenericTypeSet | Anzahl Interfaces mit Type Sets |
+| **Erweiterung 4: Generic Instantiations** | |
+| GenericFuncInstantiationExplicit | Explizite Instanziierungen lokaler generischer Funktionen (z.B. `f[int](x)`) |
+| GenericFuncInstantiationInferred | Inferrierte Instanziierungen lokaler generischer Funktionen (z.B. `f(x)`) |
+| GenericFuncInstantiationExternalExplicit | Explizite Instanziierungen externer generischer Funktionen |
+| GenericFuncInstantiationExternalInferred | Inferrierte Instanziierungen externer generischer Funktionen |
+| GenericTypeInstantiationExplicit | Explizite Instanziierungen lokaler generischer Types (z.B. `Box[int]{}`) |
+| GenericTypeInstantiationInferred | Inferrierte Instanziierungen lokaler generischer Types (z.B. `Box{value: 1}`) |
+| GenericTypeInstantiationExternalExplicit | Explizite Instanziierungen externer generischer Types |
+| GenericTypeInstantiationExternalInferred | Inferrierte Instanziierungen externer generischer Types |
 
 ---
 
@@ -359,3 +368,128 @@ Die Erkennung erfolgt durch:
 - Besseres Verständnis der tatsächlichen Nutzung von Constraints
 - Identifikation von Patterns in der Generic-Verwendung
 - Erkennung von over-generic vs. properly-constrained Code
+
+---
+
+### Erweiterung 4: Generic Function/Method Instantiations
+
+**Problem**: Die Verwendung von generischen Funktionen und Methoden kann auf zwei Arten erfolgen:
+
+1. **Explizit**: `f[int](1)` - Typ ist direkt im Code sichtbar
+2. **Inferiert**: `f(2)` - Typ wird durch Type Inference ermittelt
+
+Für eine vollständige Analyse ist es wichtig zu verstehen:
+
+- Wie oft werden Generics tatsächlich verwendet?
+- Werden Type-Parameter explizit angegeben oder inferriert?
+- Werden lokale oder externe generische Funktionen/Methoden verwendet?
+
+**Lösung**: Kombinierter Ansatz mit AST + go/types:
+
+1. **AST-basierte Erkennung** für explizite Instanziierungen (`f[int](x)`)
+2. **go/types Analyse** für inferrierte Instanziierungen (`f(x)`)
+3. **Unterscheidung lokal vs. extern** für bessere Einordnung
+
+**Technische Umsetzung**:
+
+**Phase 1 - Lokale Generics sammeln:**
+
+```go
+// Sammelt alle generischen Funktionen/Methoden im aktuellen File
+localGenerics := collectLocalGenerics(file)
+// Speichert: Name, isMethod flag, Anzahl Type Parameters
+```
+
+**Phase 2 - Explizite Instanziierungen (AST):**
+
+```go
+// Erkennt: f[int](x) oder obj.m[int](x)
+// CallExpr.Fun ist IndexExpr oder IndexListExpr
+if indexExpr, ok := callExpr.Fun.(*ast.IndexExpr); ok {
+    // Explizite Typ-Angabe gefunden
+}
+```
+
+**Phase 3 - Inferrierte Instanziierungen (go/types):**
+
+```go
+// Setup Type Checker
+info := &types.Info{
+    Instances: make(map[*ast.Ident]types.Instance),
+}
+// Erkennt: f(x) wo f generisch ist
+if _, hasInstance := info.Instances[ident]; hasInstance {
+    // Type Inference wurde verwendet
+}
+```
+
+**Metriken**:
+
+| Metrik | Beschreibung |
+| -------- | -------------- |
+| GenericFuncInstantiationExplicit | `f[int](x)` - lokale Funktionen |
+| GenericFuncInstantiationInferred | `f(x)` - lokale Funktionen mit Type Inference |
+| GenericFuncInstantiationExternalExplicit | `pkg.F[int](x)` - externe Funktionen |
+| GenericFuncInstantiationExternalInferred | `pkg.F(x)` - externe Funktionen mit Type Inference |
+| GenericTypeInstantiationExplicit | `Box[int]{}` - lokale Types |
+| GenericTypeInstantiationInferred | `Box{value: 1}` - lokale Types mit Type Inference |
+| GenericTypeInstantiationExternalExplicit | `pkg.Type[int]{}` - externe Types |
+| GenericTypeInstantiationExternalInferred | `pkg.Type{}` - externe Types mit Type Inference |
+
+**Wichtige Anmerkung zu Methoden**:
+In Go können **Methoden selbst keine Type Parameters haben** - nur der Receiver-Typ kann generisch sein. Daher zählen wir keine "generic method instantiations", sondern nur generic function und generic type instantiations.
+
+**Beispiele**:
+
+```go
+// === FUNCTION INSTANTIATIONS ===
+
+// Generic function definition
+func Print[T any](x T) {
+    fmt.Printf("%v\n", x)
+}
+
+func test() {
+    // Explizit - LEICHT zu erkennen (AST)
+    Print[int](42)      // → GenericFuncInstantiationExplicit
+    Print[string]("hi") // → GenericFuncInstantiationExplicit
+    
+    // Inferiert - SCHWER zu erkennen (benötigt go/types)
+    Print(42)     // → GenericFuncInstantiationInferred (T = int)
+    Print("hi")   // → GenericFuncInstantiationInferred (T = string)
+    
+    // External (z.B. slices.Sort)
+    slices.Sort[int]([]int{3, 1, 2})  // → GenericFuncInstantiationExternalExplicit
+    slices.Sort([]int{3, 1, 2})       // → GenericFuncInstantiationExternalInferred
+}
+
+// === TYPE INSTANTIATIONS ===
+
+type Box[T any] struct {
+    value T
+}
+
+func testTypes() {
+    // Explizit - LEICHT zu erkennen (AST)
+    box1 := Box[int]{value: 42}     // → GenericTypeInstantiationExplicit
+    var box2 Box[string]             // → GenericTypeInstantiationExplicit
+    
+    // Inferiert - SCHWER zu erkennen (benötigt go/types)
+    // HINWEIS: Go erlaubt Type Inference bei Composite Literals nur in bestimmten Kontexten
+    // In den meisten Fällen wird explizite Typ-Angabe verlangt
+    // box3 := Box{value: 1}  // Fehler: "cannot use generic type Box[T any] without instantiation"
+}
+```
+
+**Feature Flag**:
+
+- Die Analyse ist **opt-in** via `ENABLE_TYPE_INFERENCE=true`
+- Grund: go/types Analyse kann langsam sein bei großen Projekten
+- Default: disabled für bessere Performance
+
+**Impact**:
+
+- Verständnis der tatsächlichen Generic-Nutzung in der Praxis
+- Identifikation von Patterns: Werden Typen explizit angegeben oder inferriert?
+- Unterscheidung zwischen lokaler und externer Generic-Verwendung
+- Datengrundlage für die Frage: "Lohnt sich Type Inference?"

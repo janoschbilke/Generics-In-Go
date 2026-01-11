@@ -9,9 +9,10 @@ import (
 )
 
 type SetupConfiguration struct {
-	Token        string
-	CSVPath      string
-	LocalProject string
+	Token              string
+	CSVPath            string
+	LocalProject       string
+	EnableTypeInference bool 
 }
 
 func SetupEnvironment() (SetupConfiguration, error) {
@@ -52,6 +53,11 @@ func SetupEnvironment() (SetupConfiguration, error) {
 
 	config.Token = token
 	config.CSVPath = csvPath
+	
+	// Erweiterung 4: Type Inference Flag (default: false für bessere Performance)
+	typeInferenceEnv := os.Getenv("ENABLE_TYPE_INFERENCE")
+	config.EnableTypeInference = strings.ToLower(typeInferenceEnv) == "true" || typeInferenceEnv == "1"
+	
 	return config, nil
 }
 
