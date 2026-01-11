@@ -24,7 +24,7 @@ func aggregateCounters(target *model.GenericCounters, source model.GenericCounte
 	target.TypeDecl += source.TypeDecl
 	target.GenericTypeDecl += source.GenericTypeDecl
 	target.GenericTypeSet += source.GenericTypeSet
-	
+
 	target.GenericFuncInstantiationExplicit += source.GenericFuncInstantiationExplicit
 	target.GenericFuncInstantiationInferred += source.GenericFuncInstantiationInferred
 	target.GenericTypeInstantiationExplicit += source.GenericTypeInstantiationExplicit
@@ -43,7 +43,7 @@ func printCountersSummary(counters model.GenericCounters, title string) {
 	fmt.Printf("StructAsTypeBound: %v\n", counters.StructAsTypeBound)
 	fmt.Printf("GenericTypeDecl: %v\n", counters.GenericTypeDecl)
 	fmt.Printf("GenericTypeSet: %v\n", counters.GenericTypeSet)
-	
+
 	if counters.GenericFuncInstantiationExplicit > 0 || counters.GenericFuncInstantiationInferred > 0 ||
 		counters.GenericTypeInstantiationExplicit > 0 || counters.GenericTypeInstantiationInferred > 0 {
 		fmt.Println("\nGeneric Instantiations:")
@@ -82,14 +82,25 @@ func main() {
 	counterOverEveryRepository := model.GenericCounters{}
 
 	// Datenbank erstellen
-	sqliteDB, err := database.NewSQLiteDB("generic_counters.db")
+	var genericsDatabase database.GenericsDatabase
+	if config.OutputFormat == "csv" {
+		genericsDatabase, err = database.NewCsvDatabase("generic_counters.csv")
+		if err != nil {
+			log.Fatalf("Failed to create CSV genericsDatabase: %v", err)
+		}
+	} else {
+		genericsDatabase, err = database.NewSQLiteDB("generic_counters.db")
+		if err != nil {
+			log.Fatalf("Failed to create SQLite genericsDatabase: %v", err)
+		}
+	}
 	if err != nil {
-		log.Fatalf("Failed to create database: %v", err)
+		log.Fatalf("Failed to create genericsDatabase: %v", err)
 	}
 
 	defer func() {
-		if err := sqliteDB.Close(); err != nil {
-			log.Fatalf("Failed to close database: %v", err)
+		if err := genericsDatabase.Close(); err != nil {
+			log.Fatalf("Failed to close genericsDatabase: %v", err)
 		}
 	}()
 
@@ -134,8 +145,8 @@ func main() {
 
 		// In Datenbank speichern
 		countersForProject.Repository = projectName
-		if err := sqliteDB.AddGenericCountersEntry(countersForProject); err != nil {
-			log.Fatalf("Failed to add entry to database: %v", err)
+		if err := genericsDatabase.AddGenericCountersEntry(countersForProject); err != nil {
+			log.Fatalf("Failed to add entry to genericsDatabase: %v", err)
 		}
 
 		// Gesamt-Statistik
@@ -145,7 +156,7 @@ func main() {
 	}
 
 	// === GITHUB MODUS (wie bisher) ===
-	entries, err := utils.GetOwnerAndRepo(config.CSVPath)
+	entries, err := utils.GetOwnerAndRepo(config.InputCSVPath)
 	if err != nil {
 		log.Fatalf("Failed to read CSV file: %v", err)
 	}
@@ -197,8 +208,8 @@ func main() {
 
 			// In Datenbank speichern
 			countersForEntireRepo.Repository = repoName
-			if err := sqliteDB.AddGenericCountersEntry(countersForEntireRepo); err != nil {
-				log.Fatalf("Failed to add entry to database: %v", err)
+			if err := genericsDatabase.AddGenericCountersEntry(countersForEntireRepo); err != nil {
+				log.Fatalf("Failed to add entry to genericsDatabase: %v", err)
 			}
 		}
 	}

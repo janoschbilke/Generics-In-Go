@@ -14,10 +14,10 @@ Dazu im Terminal folgende Befehle ausführen:
 
 ```bash
 export GITHUB_TOKEN=ghp_...
-export CSV_PATH=./Pfad/Zur/CSV/Datei
+export INPUT_CSV_PATH=./Pfad/Zur/CSV/Datei
 ```
 
-Default Wert für den CSV_PATH ist `../input/alleSourcegraph.csv`.
+Default Wert für den INPUT_CSV_PATH ist `../input/alleSourcegraph.csv`.
 
 ### Bereitstellung durch eine Secret-Datei
 
@@ -53,13 +53,24 @@ In VSC sieht die Launch-Konfiguration dann beispielsweise so aus:
 }
 ```
 
-In der Datei selbst muss das Token und der Pfad zu der CSV-Datei eingefügt werden.
+In der Datei selbst muss das Token und der Pfad zu der Input-CSV-Datei eingefügt werden.
 Dabei gilt folgendes Format:
 
 ```env
 GITHUB_TOKEN=ghp_...
-CSV_PATH=../input/alleSourcegraph.csv
+INPUT_CSV_PATH=../input/alleSourcegraph.csv
 ```
+
+### Outputformat festlegen
+In der secrets.env Datei kann zusätzlich das Outputformat festgelegt werden.
+Dazu die folgende Zeile hinzufügen:
+```env
+OUTPUT_FORMAT=csv
+```
+
+Als Standardwert wird `csv` verwendet.
+Alternativ ist aktuell auch `sqlite` möglich.
+Es wird dabei automatisch im Ausführungsverzeichnis eine Datei `generic_counters.csv`, oder `generic_counters.db` erstellt.
 
 Anschließend kann das Programm wie gewohnt ausgeführt werden.
 Bei Fehlern bitte den Output des Programms selbst betrachten.
@@ -95,7 +106,7 @@ Füge die folgende Zeile zu deiner `secrets.env` Datei hinzu:
 
 ```env
 GITHUB_TOKEN=ghp_...
-CSV_PATH=../input/alleSourcegraph.csv
+INPUT_CSV_PATH=../input/alleSourcegraph.csv
 LOCAL_PROJECT_PATH=/absolute/path/to/LocalTestProject
 ```
 
@@ -130,5 +141,5 @@ Um vom lokalen Modus zurück zum GitHub-Modus zu wechseln, entferne oder komment
 ```env
 # LOCAL_PROJECT_PATH=/path/to/project
 GITHUB_TOKEN=ghp_...
-CSV_PATH=../input/alleSourcegraph.csv
+INPUT_CSV_PATH=../input/alleSourcegraph.csv
 ```

@@ -9,10 +9,11 @@ import (
 )
 
 type SetupConfiguration struct {
-	Token              string
-	CSVPath            string
-	LocalProject       string
-	EnableTypeInference bool 
+	Token               string
+	InputCSVPath        string
+	LocalProject        string
+	EnableTypeInference bool
+	OutputFormat        string
 }
 
 func SetupEnvironment() (SetupConfiguration, error) {
@@ -24,7 +25,7 @@ func SetupEnvironment() (SetupConfiguration, error) {
 		if err != nil {
 			secretsPath = "secret.env"
 		} else {
-			secretsPath = fmt.Sprintf("%s/secret.env", dir)
+			secretsPath = fmt.Sprintf("%s/../secret.env", dir)
 		}
 	}
 
@@ -40,8 +41,9 @@ func SetupEnvironment() (SetupConfiguration, error) {
 	if token == "" && config.LocalProject == "" {
 		return SetupConfiguration{}, fmt.Errorf("GITHUB_TOKEN not found - set GOPARSER_SECRETS_PATH or use VSCode launch.json")
 	}
+	config.Token = token
 
-	csvPath := os.Getenv("CSV_PATH")
+	csvPath := os.Getenv("INPUT_CSV_PATH")
 	if csvPath == "" {
 		dir, err := os.Getwd()
 		if err != nil {
@@ -50,14 +52,18 @@ func SetupEnvironment() (SetupConfiguration, error) {
 		}
 		csvPath = fmt.Sprintf("%s/input/alleSourcegraph.csv", dir)
 	}
+	config.InputCSVPath = csvPath
 
-	config.Token = token
-	config.CSVPath = csvPath
-	
+	outputFormat := os.Getenv("OUTPUT_FORMAT")
+	if outputFormat == "" {
+		outputFormat = "csv" // Nutze CSV als Standardformat
+	}
+	config.OutputFormat = outputFormat
+
 	// Erweiterung 4: Type Inference Flag (default: false für bessere Performance)
 	typeInferenceEnv := os.Getenv("ENABLE_TYPE_INFERENCE")
 	config.EnableTypeInference = strings.ToLower(typeInferenceEnv) == "true" || typeInferenceEnv == "1"
-	
+
 	return config, nil
 }
 
