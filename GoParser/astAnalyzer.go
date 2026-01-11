@@ -71,7 +71,7 @@ func (a *astAnalyzerImpl) AnalyzeFileWithConfig(src string, enableTypeInference 
 func performTypeChecking(file *ast.File, fset *token.FileSet, src string) (*types.Info, error) {
 	conf := types.Config{
 		Importer: nil, // Explicit choice to not use importer and avoid external dependencies
-		Error:    func(err error) {},
+		Error:    func(err error) {}, // Suppress all type checking errors
 	}
 
 	info := &types.Info{
@@ -80,10 +80,9 @@ func performTypeChecking(file *ast.File, fset *token.FileSet, src string) (*type
 		Instances: make(map[*ast.Ident]types.Instance),
 	}
 
-	_, err := conf.Check(file.Name.Name, fset, []*ast.File{file}, info)
-	if err != nil {
-		log.Printf("Type checking encountered errors (continuing anyway): %v", err)
-	}
+	// Perform type checking - errors are suppressed by the Error callback
+	// We only care about collecting type instantiation information from types.Info
+	conf.Check(file.Name.Name, fset, []*ast.File{file}, info)
 
 	return info, nil
 }
