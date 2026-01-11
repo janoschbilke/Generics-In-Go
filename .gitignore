@@ -3,3 +3,4 @@
 .vscode/
 .idea/
 *.db
+GoParser/generic_counters.csv
