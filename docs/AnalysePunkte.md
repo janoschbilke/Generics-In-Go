@@ -6,30 +6,26 @@ Diese Dokumentation beschreibt alle analysierten Metriken und wie sie ermittelt 
 
 Der AST-Analyzer zählt folgende Metriken in Go-Projekten:
 
-| Metrik | Beschreibung |
-| -------- | -------------- |
-| FuncTotal | Gesamtanzahl aller Funktionen |
-| FuncGeneric | Anzahl generischer Funktionen |
-| MethodTotal | Gesamtanzahl aller Methoden |
-| MethodWithGenericReceiver | Anzahl Methoden mit generischem Receiver |
-| MethodWithGenericReceiverTrivialTypeBound | Anzahl Methoden mit generischem Receiver und trivialem Type Bound |
-| MethodWithGenericReceiverNonTrivialTypeBound | Anzahl Methoden mit generischem Receiver und non-trivial Type Bound |
-| StructTotal | Gesamtanzahl aller Structs |
-| StructGeneric | Anzahl generischer Structs |
-| StructGenericBound | Anzahl generischer Structs mit non-trivial Type Bounds |
-| StructAsTypeBound | Anzahl Structs, die als Type Bound verwendet werden |
-| TypeDecl | Gesamtanzahl aller Type-Deklarationen |
-| GenericTypeDecl | Anzahl generischer Type-Deklarationen |
-| GenericTypeSet | Anzahl Interfaces mit Type Sets |
-| **Erweiterung 4: Generic Instantiations** | |
-| GenericFuncInstantiationExplicit | Explizite Instanziierungen lokaler generischer Funktionen (z.B. `f[int](x)`) |
-| GenericFuncInstantiationInferred | Inferrierte Instanziierungen lokaler generischer Funktionen (z.B. `f(x)`) |
-| GenericFuncInstantiationExternalExplicit | Explizite Instanziierungen externer generischer Funktionen |
-| GenericFuncInstantiationExternalInferred | Inferrierte Instanziierungen externer generischer Funktionen |
-| GenericTypeInstantiationExplicit | Explizite Instanziierungen lokaler generischer Types (z.B. `Box[int]{}`) |
-| GenericTypeInstantiationInferred | Inferrierte Instanziierungen lokaler generischer Types (z.B. `Box{value: 1}`) |
-| GenericTypeInstantiationExternalExplicit | Explizite Instanziierungen externer generischer Types |
-| GenericTypeInstantiationExternalInferred | Inferrierte Instanziierungen externer generischer Types |
+| Metrik                                       | Beschreibung                                                                  |
+| -------------------------------------------- | ----------------------------------------------------------------------------- |
+| FuncTotal                                    | Gesamtanzahl aller Funktionen                                                 |
+| FuncGeneric                                  | Anzahl generischer Funktionen                                                 |
+| MethodTotal                                  | Gesamtanzahl aller Methoden                                                   |
+| MethodWithGenericReceiver                    | Anzahl Methoden mit generischem Receiver                                      |
+| MethodWithGenericReceiverTrivialTypeBound    | Anzahl Methoden mit generischem Receiver und trivialem Type Bound             |
+| MethodWithGenericReceiverNonTrivialTypeBound | Anzahl Methoden mit generischem Receiver und non-trivial Type Bound           |
+| StructTotal                                  | Gesamtanzahl aller Structs                                                    |
+| StructGeneric                                | Anzahl generischer Structs                                                    |
+| StructGenericBound                           | Anzahl generischer Structs mit non-trivial Type Bounds                        |
+| StructAsTypeBound                            | Anzahl Structs, die als Type Bound verwendet werden                           |
+| TypeDecl                                     | Gesamtanzahl aller Type-Deklarationen                                         |
+| GenericTypeDecl                              | Anzahl generischer Type-Deklarationen                                         |
+| GenericTypeSet                               | Anzahl Interfaces mit Type Sets                                               |
+| **Erweiterung 4: Generic Instantiations**    |                                                                               |
+| GenericFuncInstantiationExplicit             | Explizite Instanziierungen lokaler generischer Funktionen (z.B. `f[int](x)`)  |
+| GenericFuncInstantiationInferred             | Inferrierte Instanziierungen lokaler generischer Funktionen (z.B. `f(x)`)     |
+| GenericTypeInstantiationExplicit             | Explizite Instanziierungen lokaler generischer Types (z.B. `Box[int]{}`)      |
+| GenericTypeInstantiationInferred             | Inferrierte Instanziierungen lokaler generischer Types (z.B. `Box{value: 1}`) |
 
 ---
 
@@ -56,7 +52,7 @@ func Add(a, b int) int {
 - **Beispiel**:
 
 ```go
-func Max[T comparable](a, b T) T { 
+func Max[T comparable](a, b T) T {
     if a > b {
         return a
     }
@@ -93,7 +89,7 @@ type Container[T any] struct {
     value T
 }
 
-func (c Container[T]) Get() T { 
+func (c Container[T]) Get() T {
     return c.value
 }
 ```
@@ -103,9 +99,9 @@ func (c Container[T]) Get() T {
 - **Was wird gezählt**: Methoden mit generischem Receiver, dessen Type Bound trivial ist
 - **Trivial bedeutet**: Type Bound ist `any`, `interface{}`, oder ein leeres Interface
 - **Ermittlung**:
-  1. Erster Durchlauf sammelt Typinformationen über alle generischen Typen. Das ist benötigt, weil Methodenaufrufe auch vor der Typinitialisierung stehen können. Da Go keine Reihenfolge definiert, muss zuvor betrachtet werden, ob ein Struct ein non-trivial oder trivial ist
-  2. Prüfung ob Type Bounds trivial sind (siehe unten)
-  3. Zweiter Durchlauf klassifiziert Methoden basierend auf gesammelten Informationen
+  1. `CollectTypeBoundsInfo()` sammelt Typinformationen über alle generischen Typen (siehe "Implementierungsdetails")
+  2. `MethodCheck` extrahiert den Receiver-Typ-Namen aus `IndexExpr`/`IndexListExpr`
+  3. Lookup in `typeBoundsInfo`: Wenn Typ existiert und KEINEN non-trivial Bound hat → trivial
 - **Beispiel**:
 
 ```go
@@ -138,7 +134,7 @@ type Comparable[T comparable] struct {  // Non-trivialer Bound
     items []T
 }
 
-func (c Comparable[T]) Contains(item T) bool {} 
+func (c Comparable[T]) Contains(item T) bool {}
 ```
 
 ---
@@ -152,7 +148,7 @@ func (c Comparable[T]) Contains(item T) bool {}
 - **Beispiel**:
 
 ```go
-type Person struct { 
+type Person struct {
     Name string
     Age  int
 }
@@ -165,7 +161,7 @@ type Person struct {
 - **Beispiel**:
 
 ```go
-type Container[T any] struct {  
+type Container[T any] struct {
     value T
 }
 ```
@@ -176,6 +172,7 @@ type Container[T any] struct {
 - **Non-trivial bedeutet**: Type Bound ist NICHT `any`, NICHT `interface{}`, und NICHT ein leeres Interface
 - **Ermittlung**: Iteriert durch alle Type Parameters und prüft deren Constraints
 - **Prüfung für triviale Constraints**:
+
   1. Direktes `any`: `type Foo[T any]`
   2. Direktes `interface{}`: `type Foo[T interface{}]`
   3. Leeres Interface definiert anderswo:
@@ -188,22 +185,22 @@ type Container[T any] struct {
 - **Beispiel**:
 
 ```go
-// Triviale Bounds - werden NICHT gezählt:
+// Triviale Bounds
 type Simple1[T any] struct{}
 type Simple2[T interface{}] struct{}
 
 type EmptyInterface interface{}
 type Simple3[T EmptyInterface] struct{}
 
-// Non-triviale Bounds - werden gezählt:
+// Non-triviale Bounds
 type Stringer interface {
     String() string
 }
-type Container[T Stringer] struct{}  // ✓ Wird gezählt
+type Container[T Stringer] struct{} 
 
-type Numeric[T int | float64] struct{}  // ✓ Wird gezählt
+type Numeric[T int | float64] struct{}  
 
-type Comparable[T comparable] struct{}  // ✓ Wird gezählt
+type Comparable[T comparable] struct{} 
 ```
 
 #### StructAsTypeBound (**Erweiterung 2**)
@@ -214,9 +211,9 @@ type Comparable[T comparable] struct{}  // ✓ Wird gezählt
 - **Beispiel**:
 
 ```go
-type FF struct{} 
+type FF struct{}
 
-type Foo4[T FF] struct {  
+type Foo4[T FF] struct {
     val T
 }
 
@@ -224,7 +221,7 @@ type SimpleStruct struct {
     value int
 }
 
-type Container[T SimpleStruct] struct { 
+type Container[T SimpleStruct] struct {
     data T
 }
 ```
@@ -252,11 +249,11 @@ type MyStruct struct{}
 - **Beispiel**:
 
 ```go
-type Container[T any] struct { 
+type Container[T any] struct {
     value T
 }
 
-type Mapper[K comparable, V any] map[K]V 
+type Mapper[K comparable, V any] map[K]V
 ```
 
 ---
@@ -272,11 +269,11 @@ type Mapper[K comparable, V any] map[K]V
 
 ```go
 type Numeric interface {
-    ~int | ~float64 
+    ~int | ~float64
 }
 
 type SignedInteger interface {
-    ~int | ~int8 | ~int16 | ~int32 | ~int64 
+    ~int | ~int8 | ~int16 | ~int32 | ~int64
 }
 ```
 
@@ -284,28 +281,37 @@ type SignedInteger interface {
 
 ## Implementierungsdetails
 
-### Zwei-Durchlauf-Analyse (Erweiterung 3)
+### Single-Pass-Analyse mit Vorbereitung (Erweiterung 3)
 
-Für die Unterscheidung zwischen trivialen und non-trivialen Type Bounds bei Methoden verwendet der Analyzer einen zweistufigen Ansatz:
+Für die Unterscheidung zwischen trivialen und non-trivialen Type Bounds bei Methoden verwendet der Analyzer einen effizienten Ansatz mit Vorbereitung:
 
-**Erster Durchlauf:**
+**Vorbereitungsphase (CollectTypeBoundsInfo):**
 
 ```go
-typeHasNonTrivialBound := make(map[string]bool)
-
+typeBoundsInfo := checks.CollectTypeBoundsInfo(file)
+// Map[TypeName]TypeBoundInfo
 // Sammelt für jeden generischen Typ:
 // - Typ-Name
 // - Hat er mindestens einen non-trivialen Bound?
+// - Wird ein Struct als Type Bound verwendet?
 ```
 
-**Zweiter Durchlauf:**
+**Haupt-Analyse (Single Pass):**
 
 ```go
-// Analysiert Methoden und prüft:
+// Alle Checks laufen in einem Durchlauf und nutzen typeBoundsInfo:
+context := &checks.AnalysisContext{
+    TypeBoundsInfo: typeBoundsInfo,
+    // ...
+}
+
+// MethodCheck prüft:
 // 1. Ist der Receiver generisch?
 // 2. Welcher Typ ist der Receiver?
-// 3. Hat dieser Typ triviale oder non-triviale Bounds?
+// 3. Lookup in typeBoundsInfo: Hat dieser Typ triviale oder non-triviale Bounds?
 ```
+
+**Vorteil**: Nur ein AST-Durchlauf für alle Checks, vorbereitete Informationen werden bei Bedarf nachgeschlagen.
 
 ### Trivialitätsprüfung
 
@@ -382,20 +388,18 @@ Für eine vollständige Analyse ist es wichtig zu verstehen:
 
 - Wie oft werden Generics tatsächlich verwendet?
 - Werden Type-Parameter explizit angegeben oder inferriert?
-- Werden lokale oder externe generische Funktionen/Methoden verwendet?
 
 **Lösung**: Kombinierter Ansatz mit AST + go/types:
 
 1. **AST-basierte Erkennung** für explizite Instanziierungen (`f[int](x)`)
 2. **go/types Analyse** für inferrierte Instanziierungen (`f(x)`)
-3. **Unterscheidung lokal vs. extern** für bessere Einordnung
 
 **Technische Umsetzung**:
 
 **Phase 1 - Lokale Generics sammeln:**
 
 ```go
-// Sammelt alle generischen Funktionen/Methoden im aktuellen File
+// Sammelt alle generischen Funktionen im aktuellen File
 localGenerics := collectLocalGenerics(file)
 // Speichert: Name, isMethod flag, Anzahl Type Parameters
 ```
@@ -403,7 +407,7 @@ localGenerics := collectLocalGenerics(file)
 **Phase 2 - Explizite Instanziierungen (AST):**
 
 ```go
-// Erkennt: f[int](x) oder obj.m[int](x)
+// Erkennt: z.B. f[int](x)
 // CallExpr.Fun ist IndexExpr oder IndexListExpr
 if indexExpr, ok := callExpr.Fun.(*ast.IndexExpr); ok {
     // Explizite Typ-Angabe gefunden
@@ -425,16 +429,12 @@ if _, hasInstance := info.Instances[ident]; hasInstance {
 
 **Metriken**:
 
-| Metrik | Beschreibung |
-| -------- | -------------- |
-| GenericFuncInstantiationExplicit | `f[int](x)` - lokale Funktionen |
-| GenericFuncInstantiationInferred | `f(x)` - lokale Funktionen mit Type Inference |
-| GenericFuncInstantiationExternalExplicit | `pkg.F[int](x)` - externe Funktionen |
-| GenericFuncInstantiationExternalInferred | `pkg.F(x)` - externe Funktionen mit Type Inference |
-| GenericTypeInstantiationExplicit | `Box[int]{}` - lokale Types |
+| Metrik                           | Beschreibung                                      |
+| -------------------------------- | ------------------------------------------------- |
+| GenericFuncInstantiationExplicit | `f[int](x)` - lokale Funktionen                   |
+| GenericFuncInstantiationInferred | `f(x)` - lokale Funktionen mit Type Inference     |
+| GenericTypeInstantiationExplicit | `Box[int]{}` - lokale Types                       |
 | GenericTypeInstantiationInferred | `Box{value: 1}` - lokale Types mit Type Inference |
-| GenericTypeInstantiationExternalExplicit | `pkg.Type[int]{}` - externe Types |
-| GenericTypeInstantiationExternalInferred | `pkg.Type{}` - externe Types mit Type Inference |
 
 **Wichtige Anmerkung zu Methoden**:
 In Go können **Methoden selbst keine Type Parameters haben** - nur der Receiver-Typ kann generisch sein. Daher zählen wir keine "generic method instantiations", sondern nur generic function und generic type instantiations.
@@ -450,17 +450,15 @@ func Print[T any](x T) {
 }
 
 func test() {
-    // Explizit - LEICHT zu erkennen (AST)
+    // Explizit
     Print[int](42)      // → GenericFuncInstantiationExplicit
     Print[string]("hi") // → GenericFuncInstantiationExplicit
-    
-    // Inferiert - SCHWER zu erkennen (benötigt go/types)
+
+    // Inferiert
     Print(42)     // → GenericFuncInstantiationInferred (T = int)
     Print("hi")   // → GenericFuncInstantiationInferred (T = string)
-    
-    // External (z.B. slices.Sort)
-    slices.Sort[int]([]int{3, 1, 2})  // → GenericFuncInstantiationExternalExplicit
-    slices.Sort([]int{3, 1, 2})       // → GenericFuncInstantiationExternalInferred
+
+
 }
 
 // === TYPE INSTANTIATIONS ===
@@ -470,22 +468,16 @@ type Box[T any] struct {
 }
 
 func testTypes() {
-    // Explizit - LEICHT zu erkennen (AST)
+    // Explizit
     box1 := Box[int]{value: 42}     // → GenericTypeInstantiationExplicit
     var box2 Box[string]             // → GenericTypeInstantiationExplicit
-    
+
     // Inferiert - SCHWER zu erkennen (benötigt go/types)
     // HINWEIS: Go erlaubt Type Inference bei Composite Literals nur in bestimmten Kontexten
     // In den meisten Fällen wird explizite Typ-Angabe verlangt
     // box3 := Box{value: 1}  // Fehler: "cannot use generic type Box[T any] without instantiation"
 }
 ```
-
-**Feature Flag**:
-
-- Die Analyse ist **opt-in** via `ENABLE_TYPE_INFERENCE=true`
-- Grund: go/types Analyse kann langsam sein bei großen Projekten
-- Default: disabled für bessere Performance
 
 **Impact**:
 

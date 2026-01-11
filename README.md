@@ -45,7 +45,9 @@ In VSC sieht die Launch-Konfiguration dann beispielsweise so aus:
             "request": "launch",
             "mode": "auto",
             "program": "${workspaceFolder}/GoParser/",
-            "envFile": "${workspaceFolder}/secrets.env"
+            "env": {
+                "GOPARSER_SECRETS_PATH": "${workspaceFolder}/secret.env"
+            }
         }
     ]
 }
@@ -61,6 +63,14 @@ CSV_PATH=../input/alleSourcegraph.csv
 
 Anschließend kann das Programm wie gewohnt ausgeführt werden.
 Bei Fehlern bitte den Output des Programms selbst betrachten.
+
+### Aktivierung / Deaktivierung der Instantiierungschecks
+
+Die Instantiierungschecks können die Programmlaufzeit erheblich beeinflussen. Um diese zu aktivieren oder zu deaktivieren, setze folgende Flag in der `secrets.env`-Datei:
+
+```env
+ENABLE_TYPE_INFERENCE=true
+```
 
 ## Local Development Setup
 

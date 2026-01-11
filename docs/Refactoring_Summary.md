@@ -65,7 +65,6 @@ Für die Instantiation-Checks wurde ein zusätzliches Handler-System implementie
 type ExpressionHandler interface {
     CanHandle(expr ast.Expr) bool
     IsExplicit() bool
-    IsExternal(expr ast.Expr, context *InstantiationContext) bool
 }
 ```
 
@@ -76,7 +75,7 @@ type ExpressionHandler interface {
 - **InferredIdentHandler**: `f(x)` mit Type Inference
 - **InferredSelectorHandler**: `pkg.Method(x)` mit Type Inference
 
-## Vorteile der neuen Architektur
+## Vorteile der neuen Architektur (hauptsächlich)
 
 ### 1. Separation of Concerns
 
@@ -85,20 +84,6 @@ Jeder Check hat seine eigene Klasse und Verantwortlichkeit
 ### 2. Open/Closed Principle
 
 Neue Checks können hinzugefügt werden ohne bestehenden Code zu ändern
-
-### 3. Testbarkeit
-
-Jeder Check kann isoliert getestet werden
-
-### 4. Lesbarkeit
-
-- Selbstbeschreibende Namen statt verschachtelter if-else
-- Klare Struktur durch Polymorphismus
-- Keine Type-Switch Statements mehr
-
-### 5. Wiederverwendbarkeit
-
-Checks können kombiniert und wiederverwendet werden
 
 ## Migration
 
@@ -120,26 +105,3 @@ basicChecks := []checks.ASTCheck{
 runner := checks.NewCheckRunner(basicChecks)
 runner.RunChecks(file, &counters, context)
 ```
-
-## Tests
-
-Alle Tests laufen erfolgreich:
-
-- TestASTAnalyzerBasicFunctionality
-- TestASTAnalyzerWithTypeInference
-
-## Dateien
-
-### Neue Dateien
-
-- `GoParser/checks/base.go` - Base Interfaces und CheckRunner
-- `GoParser/checks/function_checks.go` - Function/Method Checks
-- `GoParser/checks/type_checks.go` - Type/Struct/TypeSet Checks
-- `GoParser/checks/instantiation_checks.go` - Instantiation Checks
-- `GoParser/checks/instantiation_handlers.go` - Expression Handler
-- `GoParser/checks/collectors.go` - Helper Funktionen
-- `GoParser/astAnalyzer_test.go` - Unit Tests
-
-### Geänderte Dateien
-
-- `GoParser/astAnalyzer.go` - Komplett refactored, jetzt nur noch Orchestrierung
