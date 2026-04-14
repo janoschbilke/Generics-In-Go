@@ -1,7 +1,9 @@
 package utils
 
 import (
+	"GoParser/model"
 	"encoding/csv"
+	"fmt"
 	"os"
 	"strings"
 )
@@ -42,4 +44,77 @@ func GetOwnerAndRepo(filename string) ([][2]string, error) {
 	}
 
 	return result, nil
+}
+
+func PrintCSVRow(name string, counters model.GenericCounters) {
+	fmt.Printf("%s,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d\n",
+		name,
+		counters.FuncTotal,
+		counters.FuncGeneric,
+		counters.MethodTotal,
+		counters.MethodWithGenericReceiver,
+		counters.MethodWithGenericReceiverTrivialTypeBound,
+		counters.MethodWithGenericReceiverNonTrivialTypeBound,
+		counters.StructTotal,
+		counters.StructGeneric,
+		counters.StructGenericBound,
+		counters.StructAsTypeBound,
+		counters.TypeDecl,
+		counters.GenericTypeDecl,
+		counters.GenericTypeSet,
+	)
+}
+
+func PrintCSVHeader() {
+	fmt.Println("Repository,FuncTotal,FuncGeneric,MethodTotal,MethodWithGenericReceiver,MethodWithGenericReceiverTrivialTypeBound,MethodWithGenericReceiverNonTrivialTypeBound,StructTotal,StructGeneric,StructGenericNonTrivialBound,StructAsTypeBound,TypeDecl,GenericTypeDecl,GenericTypeSet")
+}
+
+// ComputeCrossRepoAggregation counts how many repositories have at least one occurrence
+// of each generic feature. This is the GitHub-mode summary statistic.
+func ComputeCrossRepoAggregation(results []model.GenericCounters) model.GenericCounters {
+	summary := model.GenericCounters{}
+	for _, r := range results {
+		if r.FuncGeneric > 0 {
+			summary.FuncGeneric++
+		}
+		if r.MethodWithGenericReceiver > 0 {
+			summary.MethodWithGenericReceiver++
+		}
+		if r.GenericTypeDecl > 0 {
+			summary.GenericTypeDecl++
+		}
+		if r.GenericTypeSet > 0 {
+			summary.GenericTypeSet++
+		}
+		if r.StructGeneric > 0 {
+			summary.StructGeneric++
+		}
+		if r.StructGenericBound > 0 {
+			summary.StructGenericBound++
+		}
+	}
+	return summary
+}
+
+func PrintCountersSummary(counters model.GenericCounters, title string) {
+	fmt.Println()
+	fmt.Printf("%s:\n", title)
+	fmt.Printf("FuncGeneric: %v\n", counters.FuncGeneric)
+	fmt.Printf("MethodWithGenericReceiver: %v\n", counters.MethodWithGenericReceiver)
+	fmt.Printf("MethodWithGenericReceiverTrivialTypeBound: %v\n", counters.MethodWithGenericReceiverTrivialTypeBound)
+	fmt.Printf("MethodWithGenericReceiverNonTrivialTypeBound: %v\n", counters.MethodWithGenericReceiverNonTrivialTypeBound)
+	fmt.Printf("StructGeneric: %v\n", counters.StructGeneric)
+	fmt.Printf("StructGenericNonTrivialBound: %v\n", counters.StructGenericBound)
+	fmt.Printf("StructAsTypeBound: %v\n", counters.StructAsTypeBound)
+	fmt.Printf("GenericTypeDecl: %v\n", counters.GenericTypeDecl)
+	fmt.Printf("GenericTypeSet: %v\n", counters.GenericTypeSet)
+
+	if counters.GenericFuncInstantiationExplicit > 0 || counters.GenericFuncInstantiationInferred > 0 ||
+		counters.GenericTypeInstantiationExplicit > 0 || counters.GenericTypeInstantiationInferred > 0 {
+		fmt.Println("\nGeneric Instantiations:")
+		fmt.Printf("  GenericFuncInstantiationExplicit: %v\n", counters.GenericFuncInstantiationExplicit)
+		fmt.Printf("  GenericFuncInstantiationInferred: %v\n", counters.GenericFuncInstantiationInferred)
+		fmt.Printf("  GenericTypeInstantiationExplicit: %v\n", counters.GenericTypeInstantiationExplicit)
+		fmt.Printf("  GenericTypeInstantiationInferred: %v\n", counters.GenericTypeInstantiationInferred)
+	}
 }
