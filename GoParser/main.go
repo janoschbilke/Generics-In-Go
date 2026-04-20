@@ -81,7 +81,7 @@ func main() {
 			log.Println(err)
 			continue
 		}
-		if config.EnableTypeInference && len(instantiations) > 0 {
+		if config.EnableTypeInference && len(instantiations) > 0 && config.LocalProject != "" {
 			utils.PrintInstantiationSummary(job.Name, instantiations)
 		}
 		log.Printf("Finished: %s", job.Name)
