@@ -12,6 +12,7 @@ type AnalysisContext struct {
 	LocalGenericTypes map[string]bool
 	TypeInfo          *types.Info
 	File              *ast.File
+	Instantiations    model.InstantiationData // populated by InstantiationCheck
 }
 
 type TypeBoundInfo struct {

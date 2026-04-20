@@ -11,7 +11,7 @@ import (
 )
 
 type ASTAnalyzer interface {
-	AnalyzeFileWithConfig(src string, enableTypeInference bool) (model.GenericCounters, error)
+	AnalyzeFileWithConfig(src string, enableTypeInference bool) (model.GenericCounters, model.InstantiationData, error)
 }
 
 type astAnalyzerImpl struct{}
@@ -20,11 +20,11 @@ func NewASTAnalyzer() ASTAnalyzer {
 	return &astAnalyzerImpl{}
 }
 
-func (a *astAnalyzerImpl) AnalyzeFileWithConfig(src string, enableTypeInference bool) (model.GenericCounters, error) {
+func (a *astAnalyzerImpl) AnalyzeFileWithConfig(src string, enableTypeInference bool) (model.GenericCounters, model.InstantiationData, error) {
 	fset := token.NewFileSet()
 	file, err := parser.ParseFile(fset, "", src, parser.AllErrors)
 	if err != nil {
-		return model.GenericCounters{}, err
+		return model.GenericCounters{}, nil, err
 	}
 
 	typeBoundsInfo := checks.CollectTypeBoundsInfo(file)
@@ -56,21 +56,24 @@ func (a *astAnalyzerImpl) AnalyzeFileWithConfig(src string, enableTypeInference 
 		} else {
 			context.TypeInfo = typeInfo
 			instantiationChecks := []checks.ASTCheck{
-				checks.NewFunctionInstantiationCheck(),
-				checks.NewTypeInstantiationCheck(),
-				&checks.TypeInstantiationFromCallCheck{},
+				checks.NewGenericFuncCallCheck(),
+				checks.NewGenericTypeCompositeLitCheck(),
+				&checks.GenericTypeCallCheck{},
+				&checks.InstantiationDiversityCheck{},
 			}
 			instRunner := checks.NewCheckRunner(instantiationChecks)
 			instRunner.RunChecks(file, &counters, context)
+
+			return counters, context.Instantiations, nil
 		}
 	}
 
-	return counters, nil
+	return counters, nil, nil
 }
 
 func performTypeChecking(file *ast.File, fset *token.FileSet, src string) (*types.Info, error) {
 	conf := types.Config{
-		Importer: nil, // Explicit choice to not use importer and avoid external dependencies
+		Importer: nil,                // Explicit choice to not use importer and avoid external dependencies
 		Error:    func(err error) {}, // Suppress all type checking errors
 	}
 

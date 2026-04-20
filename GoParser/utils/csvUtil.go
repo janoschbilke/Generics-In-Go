@@ -5,6 +5,7 @@ import (
 	"encoding/csv"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 )
 
@@ -47,7 +48,7 @@ func GetOwnerAndRepo(filename string) ([][2]string, error) {
 }
 
 func PrintCSVRow(name string, counters model.GenericCounters) {
-	fmt.Printf("%s,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d\n",
+	fmt.Printf("%s,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d\n",
 		name,
 		counters.FuncTotal,
 		counters.FuncGeneric,
@@ -62,11 +63,15 @@ func PrintCSVRow(name string, counters model.GenericCounters) {
 		counters.TypeDecl,
 		counters.GenericTypeDecl,
 		counters.GenericTypeSet,
+		counters.GenericFuncInstantiationExplicit,
+		counters.GenericFuncInstantiationInferred,
+		counters.GenericTypeInstantiationExplicit,
+		counters.GenericTypeInstantiationInferred,
 	)
 }
 
 func PrintCSVHeader() {
-	fmt.Println("Repository,FuncTotal,FuncGeneric,MethodTotal,MethodWithGenericReceiver,MethodWithGenericReceiverTrivialTypeBound,MethodWithGenericReceiverNonTrivialTypeBound,StructTotal,StructGeneric,StructGenericNonTrivialBound,StructAsTypeBound,TypeDecl,GenericTypeDecl,GenericTypeSet")
+	fmt.Println("Repository,FuncTotal,FuncGeneric,MethodTotal,MethodWithGenericReceiver,MethodWithGenericReceiverTrivialTypeBound,MethodWithGenericReceiverNonTrivialTypeBound,StructTotal,StructGeneric,StructGenericNonTrivialBound,StructAsTypeBound,TypeDecl,GenericTypeDecl,GenericTypeSet,GenericFuncInstantiationExplicit,GenericFuncInstantiationInferred,GenericTypeInstantiationExplicit,GenericTypeInstantiationInferred")
 }
 
 // ComputeCrossRepoAggregation counts how many repositories have at least one occurrence
@@ -94,6 +99,60 @@ func ComputeCrossRepoAggregation(results []model.GenericCounters) model.GenericC
 		}
 	}
 	return summary
+}
+
+// PrintInstantiationSummary prints the type-argument diversity for each generic struct and
+// function that was instantiated in the analyzed project/repository.
+// Concrete and parametric instantiations are shown separately.
+func PrintInstantiationSummary(projectName string, data model.InstantiationData) {
+	if len(data) == 0 {
+		return
+	}
+
+	// Separate names by kind
+	var structNames, funcNames []string
+	for name, entries := range data {
+		for _, entry := range entries {
+			if entry.Kind == model.KindStruct {
+				structNames = append(structNames, name)
+			} else {
+				funcNames = append(funcNames, name)
+			}
+			break // kind is uniform per name
+		}
+	}
+	sort.Strings(structNames)
+	sort.Strings(funcNames)
+
+	fmt.Printf("\nInstantiation diversity for %s:\n", projectName)
+
+	if len(structNames) > 0 {
+		fmt.Println("  [Structs]")
+		for _, name := range structNames {
+			printInstantiationLine(name, data)
+		}
+	}
+
+	if len(funcNames) > 0 {
+		fmt.Println("  [Functions]")
+		for _, name := range funcNames {
+			printInstantiationLine(name, data)
+		}
+	}
+}
+
+func printInstantiationLine(name string, data model.InstantiationData) {
+	concrete := data.ConcreteEntries(name)
+	parametric := data.ParametricEntries(name)
+
+	parts := []string{}
+	if len(concrete) > 0 {
+		parts = append(parts, fmt.Sprintf("%d concrete [%s]", len(concrete), strings.Join(concrete, ", ")))
+	}
+	if len(parametric) > 0 {
+		parts = append(parts, fmt.Sprintf("%d parametric [%s]", len(parametric), strings.Join(parametric, ", ")))
+	}
+	fmt.Printf("    %s: %s\n", name, strings.Join(parts, " + "))
 }
 
 func PrintCountersSummary(counters model.GenericCounters, title string) {
