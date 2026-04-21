@@ -4,14 +4,16 @@ import (
 	"GoParser/model"
 	"go/ast"
 	"go/types"
+	"strings"
 )
 
-type FunctionInstantiationCheck struct {
+// GenericFuncCallCheck counts generic function call sites (CallExpr).
+type GenericFuncCallCheck struct {
 	handlers []ExpressionHandler
 }
 
-func NewFunctionInstantiationCheck() *FunctionInstantiationCheck {
-	return &FunctionInstantiationCheck{
+func NewGenericFuncCallCheck() *GenericFuncCallCheck {
+	return &GenericFuncCallCheck{
 		handlers: []ExpressionHandler{
 			&IndexExprHandler{},
 			&IndexListExprHandler{},
@@ -21,12 +23,12 @@ func NewFunctionInstantiationCheck() *FunctionInstantiationCheck {
 	}
 }
 
-func (f *FunctionInstantiationCheck) Check(node ast.Node, context *AnalysisContext) bool {
+func (f *GenericFuncCallCheck) Check(node ast.Node, context *AnalysisContext) bool {
 	_, ok := node.(*ast.CallExpr)
 	return ok && context.TypeInfo != nil
 }
 
-func (f *FunctionInstantiationCheck) Update(counters *model.GenericCounters, node ast.Node, context *AnalysisContext) {
+func (f *GenericFuncCallCheck) Update(counters *model.GenericCounters, node ast.Node, context *AnalysisContext) {
 	callExpr := node.(*ast.CallExpr)
 	instContext := &InstantiationContext{
 		TypeInfo:          context.TypeInfo,
@@ -59,7 +61,7 @@ func (f *FunctionInstantiationCheck) Update(counters *model.GenericCounters, nod
 	}
 }
 
-func (f *FunctionInstantiationCheck) hasInstance(expr ast.Expr, context *InstantiationContext) bool {
+func (f *GenericFuncCallCheck) hasInstance(expr ast.Expr, context *InstantiationContext) bool {
 	if ident, ok := expr.(*ast.Ident); ok {
 		_, hasInstance := context.TypeInfo.Instances[ident]
 		return hasInstance
@@ -71,12 +73,13 @@ func (f *FunctionInstantiationCheck) hasInstance(expr ast.Expr, context *Instant
 	return false
 }
 
-type TypeInstantiationCheck struct {
+// GenericTypeCompositeLitCheck counts generic type instantiations via composite literals (CompositeLit).
+type GenericTypeCompositeLitCheck struct {
 	handlers []ExpressionHandler
 }
 
-func NewTypeInstantiationCheck() *TypeInstantiationCheck {
-	return &TypeInstantiationCheck{
+func NewGenericTypeCompositeLitCheck() *GenericTypeCompositeLitCheck {
+	return &GenericTypeCompositeLitCheck{
 		handlers: []ExpressionHandler{
 			&IndexExprHandler{},
 			&IndexListExprHandler{},
@@ -85,12 +88,12 @@ func NewTypeInstantiationCheck() *TypeInstantiationCheck {
 	}
 }
 
-func (t *TypeInstantiationCheck) Check(node ast.Node, context *AnalysisContext) bool {
+func (t *GenericTypeCompositeLitCheck) Check(node ast.Node, context *AnalysisContext) bool {
 	compLit, ok := node.(*ast.CompositeLit)
 	return ok && compLit.Type != nil && context.TypeInfo != nil
 }
 
-func (t *TypeInstantiationCheck) Update(counters *model.GenericCounters, node ast.Node, context *AnalysisContext) {
+func (t *GenericTypeCompositeLitCheck) Update(counters *model.GenericCounters, node ast.Node, context *AnalysisContext) {
 	compLit := node.(*ast.CompositeLit)
 	instContext := &InstantiationContext{
 		TypeInfo:          context.TypeInfo,
@@ -123,7 +126,7 @@ func (t *TypeInstantiationCheck) Update(counters *model.GenericCounters, node as
 	}
 }
 
-func (t *TypeInstantiationCheck) hasInstance(expr ast.Expr, context *InstantiationContext) bool {
+func (t *GenericTypeCompositeLitCheck) hasInstance(expr ast.Expr, context *InstantiationContext) bool {
 	if ident, ok := expr.(*ast.Ident); ok {
 		_, hasInstance := context.TypeInfo.Instances[ident]
 		return hasInstance
@@ -131,14 +134,80 @@ func (t *TypeInstantiationCheck) hasInstance(expr ast.Expr, context *Instantiati
 	return false
 }
 
-type TypeInstantiationFromCallCheck struct{}
+// InstantiationDiversityCheck collects concrete type-argument combinations for locally-defined generic structs and functions.
+type InstantiationDiversityCheck struct{}
 
-func (t *TypeInstantiationFromCallCheck) Check(node ast.Node, context *AnalysisContext) bool {
+func (c *InstantiationDiversityCheck) Check(node ast.Node, context *AnalysisContext) bool {
+	_, ok := node.(*ast.Ident)
+	return ok && context.TypeInfo != nil
+}
+
+func (c *InstantiationDiversityCheck) Update(counters *model.GenericCounters, node ast.Node, context *AnalysisContext) {
+	ident := node.(*ast.Ident)
+	instance, hasInstance := context.TypeInfo.Instances[ident]
+	if !hasInstance || instance.TypeArgs == nil || instance.TypeArgs.Len() == 0 {
+		return
+	}
+
+	var kind model.InstantiationKind
+
+	// Check for locally-defined generic struct
+	if context.LocalGenericTypes[ident.Name] {
+		if named, ok := instance.Type.(*types.Named); ok {
+			if _, isStruct := named.Underlying().(*types.Struct); isStruct {
+				kind = model.KindStruct
+			}
+		}
+	}
+
+	// Check for locally-defined generic function
+	if kind == "" && context.LocalGenerics[ident.Name] != nil {
+		if _, isFunc := instance.Type.(*types.Signature); isFunc {
+			kind = model.KindFunction
+		}
+	}
+
+	if kind == "" {
+		return
+	}
+
+	// Build type-arg string and detect parametric arguments
+	isParametric := false
+	typeArgStrings := make([]string, instance.TypeArgs.Len())
+	for i := 0; i < instance.TypeArgs.Len(); i++ {
+		arg := instance.TypeArgs.At(i)
+		typeArgStrings[i] = unqualifiedTypeName(arg)
+		if _, ok := arg.(*types.TypeParam); ok {
+			isParametric = true
+		}
+	}
+	combo := strings.Join(typeArgStrings, ", ")
+
+	key := model.InstantiationKey(kind, ident.Name)
+
+	if context.Instantiations == nil {
+		context.Instantiations = make(model.InstantiationData)
+	}
+	if context.Instantiations[key] == nil {
+		context.Instantiations[key] = make(map[string]model.InstantiationEntry)
+	}
+	context.Instantiations[key][combo] = model.InstantiationEntry{
+		Name:         ident.Name,
+		TypeArgs:     combo,
+		IsParametric: isParametric,
+		Kind:         kind,
+	}
+}
+
+// GenericTypeCallCheck counts generic type instantiations that occur via function calls (CallExpr).
+type GenericTypeCallCheck struct{}
+
+func (t *GenericTypeCallCheck) Check(node ast.Node, context *AnalysisContext) bool {
 	_, ok := node.(*ast.CallExpr)
 	return ok && context.TypeInfo != nil
 }
 
-func (t *TypeInstantiationFromCallCheck) Update(counters *model.GenericCounters, node ast.Node, context *AnalysisContext) {
+func (t *GenericTypeCallCheck) Update(counters *model.GenericCounters, node ast.Node, context *AnalysisContext) {
 	callExpr := node.(*ast.CallExpr)
 
 	if typeAndValue, ok := context.TypeInfo.Types[callExpr]; ok {

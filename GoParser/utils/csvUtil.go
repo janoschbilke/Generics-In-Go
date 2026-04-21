@@ -5,6 +5,7 @@ import (
 	"encoding/csv"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 )
 
@@ -47,7 +48,7 @@ func GetOwnerAndRepo(filename string) ([][2]string, error) {
 }
 
 func PrintCSVRow(name string, counters model.GenericCounters) {
-	fmt.Printf("%s,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d\n",
+	fmt.Printf("%s,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d\n",
 		name,
 		counters.FuncTotal,
 		counters.FuncGeneric,
@@ -62,11 +63,15 @@ func PrintCSVRow(name string, counters model.GenericCounters) {
 		counters.TypeDecl,
 		counters.GenericTypeDecl,
 		counters.GenericTypeSet,
+		counters.GenericFuncInstantiationExplicit,
+		counters.GenericFuncInstantiationInferred,
+		counters.GenericTypeInstantiationExplicit,
+		counters.GenericTypeInstantiationInferred,
 	)
 }
 
 func PrintCSVHeader() {
-	fmt.Println("Repository,FuncTotal,FuncGeneric,MethodTotal,MethodWithGenericReceiver,MethodWithGenericReceiverTrivialTypeBound,MethodWithGenericReceiverNonTrivialTypeBound,StructTotal,StructGeneric,StructGenericNonTrivialBound,StructAsTypeBound,TypeDecl,GenericTypeDecl,GenericTypeSet")
+	fmt.Println("Repository,FuncTotal,FuncGeneric,MethodTotal,MethodWithGenericReceiver,MethodWithGenericReceiverTrivialTypeBound,MethodWithGenericReceiverNonTrivialTypeBound,StructTotal,StructGeneric,StructGenericNonTrivialBound,StructAsTypeBound,TypeDecl,GenericTypeDecl,GenericTypeSet,GenericFuncInstantiationExplicit,GenericFuncInstantiationInferred,GenericTypeInstantiationExplicit,GenericTypeInstantiationInferred")
 }
 
 // ComputeCrossRepoAggregation counts how many repositories have at least one occurrence
@@ -94,6 +99,62 @@ func ComputeCrossRepoAggregation(results []model.GenericCounters) model.GenericC
 		}
 	}
 	return summary
+}
+
+func PrintInstantiationSummary(projectName string, data model.InstantiationData) {
+	if len(data) == 0 {
+		return
+	}
+
+	var structKeys, funcKeys []string
+	for key, entries := range data {
+		for _, entry := range entries {
+			if entry.Kind == model.KindStruct {
+				structKeys = append(structKeys, key)
+			} else {
+				funcKeys = append(funcKeys, key)
+			}
+			break
+		}
+	}
+	sort.Strings(structKeys)
+	sort.Strings(funcKeys)
+
+	fmt.Printf("\nInstantiation diversity for %s:\n", projectName)
+
+	if len(structKeys) > 0 {
+		fmt.Println("  [Structs]")
+		for _, key := range structKeys {
+			printInstantiationLine(key, data)
+		}
+	}
+
+	if len(funcKeys) > 0 {
+		fmt.Println("  [Functions]")
+		for _, key := range funcKeys {
+			printInstantiationLine(key, data)
+		}
+	}
+}
+
+func printInstantiationLine(key string, data model.InstantiationData) {
+	concrete := data.ConcreteEntries(key)
+	parametric := data.ParametricEntries(key)
+
+	displayName := key
+	for _, entry := range data[key] {
+		displayName = entry.Name
+		break
+	}
+
+	parts := []string{}
+	if len(concrete) > 0 {
+		parts = append(parts, fmt.Sprintf("%d concrete [%s]", len(concrete), strings.Join(concrete, ", ")))
+	}
+	if len(parametric) > 0 {
+		parts = append(parts, fmt.Sprintf("%d parametric [%s]", len(parametric), strings.Join(parametric, ", ")))
+	}
+	fmt.Printf("    %s: %s\n", displayName, strings.Join(parts, " + "))
 }
 
 func PrintCountersSummary(counters model.GenericCounters, title string) {

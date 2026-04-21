@@ -2,7 +2,14 @@ package checks
 
 import (
 	"go/ast"
+	"go/types"
 )
+
+func unqualifiedTypeName(t types.Type) string {
+	return types.TypeString(t, func(_ *types.Package) string {
+		return "" // omit package path; TypeString keeps the bare type name
+	})
+}
 
 func CollectTypeBoundsInfo(file *ast.File) map[string]TypeBoundInfo {
 	typeBoundsInfo := make(map[string]TypeBoundInfo)

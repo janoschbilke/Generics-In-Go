@@ -1,7 +1,6 @@
 package main
 
 import (
-	"GoParser/database"
 	"GoParser/model"
 	"fmt"
 	"log"
@@ -22,13 +21,13 @@ func main() {
 		log.Fatalf("Failed to set up environment: %v", err)
 	}
 
-	genericsDatabase, err := utils.CreateDatabase(config)
+	dbs, err := utils.CreateDatabases(config)
 	if err != nil {
-		log.Fatalf("Failed to create database: %v", err)
+		log.Fatalf("Failed to create databases: %v", err)
 	}
 	defer func() {
-		if err := genericsDatabase.Close(); err != nil {
-			log.Fatalf("Failed to close genericsDatabase: %v", err)
+		if err := dbs.Close(); err != nil {
+			log.Fatalf("Failed to close databases: %v", err)
 		}
 	}()
 
@@ -77,10 +76,13 @@ func main() {
 
 	var results []model.GenericCounters
 	for _, job := range jobs {
-		counters, err := processJob(job, astAnalyzer, genericsDatabase, config.EnableTypeInference)
+		counters, instantiations, err := processJob(job, astAnalyzer, dbs, config.EnableTypeInference)
 		if err != nil {
 			log.Println(err)
 			continue
+		}
+		if config.EnableTypeInference && len(instantiations) > 0 && config.LocalProject != "" {
+			utils.PrintInstantiationSummary(job.Name, instantiations)
 		}
 		log.Printf("Finished: %s", job.Name)
 		results = append(results, counters)
@@ -96,36 +98,45 @@ func main() {
 	}
 }
 
-func analyzeFiles(files []string, analyzer ASTAnalyzer, enableTypeInference bool) model.GenericCounters {
+func analyzeFiles(files []string, analyzer ASTAnalyzer, enableTypeInference bool) (model.GenericCounters, model.InstantiationData) {
 	counters := model.GenericCounters{}
+	allInstantiations := make(model.InstantiationData)
 	for _, file := range files {
-		counts, err := analyzer.AnalyzeFileWithConfig(file, enableTypeInference)
+		counts, instantiations, err := analyzer.AnalyzeFileWithConfig(file, enableTypeInference)
 		if err != nil {
 			log.Println("Error:", err)
 		} else {
 			aggregateCounters(&counters, counts)
+			allInstantiations.Merge(instantiations)
 		}
 	}
-	return counters
+	return counters, allInstantiations
 }
 
-// processJob fetches files for a job, analyzes them, prints a CSV row, and saves the result to the DB, it returns the aggregated counters for the job so callers can compute summaries
-func processJob(job AnalysisJob, analyzer ASTAnalyzer, db database.GenericsDatabase, enableTypeInference bool) (model.GenericCounters, error) {
+// processJob fetches files for a job, analyzes them, prints a CSV row, and saves all results to the databases.
+// It returns the aggregated counters and instantiation data so callers can print summaries.
+func processJob(job AnalysisJob, analyzer ASTAnalyzer, dbs *utils.DatabaseSet, enableTypeInference bool) (model.GenericCounters, model.InstantiationData, error) {
 	files, err := job.FetchFiles()
 	if err != nil {
-		return model.GenericCounters{}, err
+		return model.GenericCounters{}, nil, err
 	}
 
-	counters := analyzeFiles(files, analyzer, enableTypeInference)
+	counters, instantiations := analyzeFiles(files, analyzer, enableTypeInference)
 	counters.Repository = job.Name
 
 	utils.PrintCSVRow(job.Name, counters)
 
-	if err := db.AddGenericCountersEntry(counters); err != nil {
-		return counters, fmt.Errorf("failed to add entry to database: %w", err)
+	if err := dbs.Generics.AddGenericCountersEntry(counters); err != nil {
+		return counters, instantiations, fmt.Errorf("failed to add entry to database: %w", err)
 	}
 
-	return counters, nil
+	if dbs.Instantiations != nil && len(instantiations) > 0 {
+		if err := dbs.Instantiations.AddInstantiationData(job.Name, instantiations); err != nil {
+			return counters, instantiations, fmt.Errorf("failed to add instantiation data to database: %w", err)
+		}
+	}
+
+	return counters, instantiations, nil
 }
 
 func aggregateCounters(target *model.GenericCounters, source model.GenericCounters) {
