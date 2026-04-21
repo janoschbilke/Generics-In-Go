@@ -101,15 +101,11 @@ func ComputeCrossRepoAggregation(results []model.GenericCounters) model.GenericC
 	return summary
 }
 
-// PrintInstantiationSummary prints the type-argument diversity for each generic struct and
-// function that was instantiated in the analyzed project/repository.
-// Concrete and parametric instantiations are shown separately.
 func PrintInstantiationSummary(projectName string, data model.InstantiationData) {
 	if len(data) == 0 {
 		return
 	}
 
-	// Separate names by kind
 	var structNames, funcNames []string
 	for name, entries := range data {
 		for _, entry := range entries {
@@ -118,7 +114,7 @@ func PrintInstantiationSummary(projectName string, data model.InstantiationData)
 			} else {
 				funcNames = append(funcNames, name)
 			}
-			break // kind is uniform per name
+			break
 		}
 	}
 	sort.Strings(structNames)

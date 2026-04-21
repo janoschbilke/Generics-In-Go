@@ -8,7 +8,6 @@ import (
 )
 
 // GenericFuncCallCheck counts generic function call sites (CallExpr).
-// It increments GenericFuncInstantiationExplicit or GenericFuncInstantiationInferred.
 type GenericFuncCallCheck struct {
 	handlers []ExpressionHandler
 }
@@ -75,7 +74,6 @@ func (f *GenericFuncCallCheck) hasInstance(expr ast.Expr, context *Instantiation
 }
 
 // GenericTypeCompositeLitCheck counts generic type instantiations via composite literals (CompositeLit).
-// It increments GenericTypeInstantiationExplicit or GenericTypeInstantiationInferred.
 type GenericTypeCompositeLitCheck struct {
 	handlers []ExpressionHandler
 }
@@ -136,9 +134,7 @@ func (t *GenericTypeCompositeLitCheck) hasInstance(expr ast.Expr, context *Insta
 	return false
 }
 
-// InstantiationDiversityCheck collects concrete type-argument combinations for locally-defined
-// generic structs and functions. Results are written into context.Instantiations so
-// they can be read by astAnalyzer after the check run.
+// InstantiationDiversityCheck collects concrete type-argument combinations for locally-defined generic structs and functions.
 type InstantiationDiversityCheck struct{}
 
 func (c *InstantiationDiversityCheck) Check(node ast.Node, context *AnalysisContext) bool {
@@ -201,7 +197,6 @@ func (c *InstantiationDiversityCheck) Update(counters *model.GenericCounters, no
 }
 
 // GenericTypeCallCheck counts generic type instantiations that occur via function calls (CallExpr).
-// This catches constructor-style patterns where the return type is a generic named type.
 type GenericTypeCallCheck struct{}
 
 func (t *GenericTypeCallCheck) Check(node ast.Node, context *AnalysisContext) bool {
