@@ -12,9 +12,14 @@ const (
 
 // InstantiationEntry represents a single observed instantiation of a generic type or function
 type InstantiationEntry struct {
+	Name         string
 	TypeArgs     string
 	IsParametric bool
 	Kind         InstantiationKind
+}
+
+func InstantiationKey(kind InstantiationKind, name string) string {
+	return string(kind) + ":" + name
 }
 
 // InstantiationData maps each generic struct/function name to the set of observed instantiations.

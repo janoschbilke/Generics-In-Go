@@ -62,8 +62,10 @@ INPUT_CSV_PATH=../input/alleSourcegraph.csv
 ```
 
 ### Outputformat festlegen
+
 In der secrets.env Datei kann zusätzlich das Outputformat festgelegt werden.
 Dazu die folgende Zeile hinzufügen:
+
 ```env
 OUTPUT_FORMAT=csv
 ```

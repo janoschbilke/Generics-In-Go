@@ -44,12 +44,12 @@ func (db *InstantiationCsvDatabase) AddInstantiationData(repository string, data
 	}
 	sort.Strings(names)
 
-	for _, name := range names {
-		entries := data[name]
+	for _, key := range names {
+		entries := data[key]
 
-		// Determine kind from the first entry (uniform per name)
-		var kind string
+		var name, kind string
 		for _, e := range entries {
+			name = e.Name
 			kind = string(e.Kind)
 			break
 		}

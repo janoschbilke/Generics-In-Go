@@ -176,20 +176,23 @@ func (c *InstantiationDiversityCheck) Update(counters *model.GenericCounters, no
 	typeArgStrings := make([]string, instance.TypeArgs.Len())
 	for i := 0; i < instance.TypeArgs.Len(); i++ {
 		arg := instance.TypeArgs.At(i)
-		typeArgStrings[i] = shortTypeName(arg.String())
+		typeArgStrings[i] = unqualifiedTypeName(arg)
 		if _, ok := arg.(*types.TypeParam); ok {
 			isParametric = true
 		}
 	}
 	combo := strings.Join(typeArgStrings, ", ")
 
+	key := model.InstantiationKey(kind, ident.Name)
+
 	if context.Instantiations == nil {
 		context.Instantiations = make(model.InstantiationData)
 	}
-	if context.Instantiations[ident.Name] == nil {
-		context.Instantiations[ident.Name] = make(map[string]model.InstantiationEntry)
+	if context.Instantiations[key] == nil {
+		context.Instantiations[key] = make(map[string]model.InstantiationEntry)
 	}
-	context.Instantiations[ident.Name][combo] = model.InstantiationEntry{
+	context.Instantiations[key][combo] = model.InstantiationEntry{
+		Name:         ident.Name,
 		TypeArgs:     combo,
 		IsParametric: isParametric,
 		Kind:         kind,

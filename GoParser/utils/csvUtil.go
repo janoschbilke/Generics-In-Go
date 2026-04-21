@@ -106,40 +106,46 @@ func PrintInstantiationSummary(projectName string, data model.InstantiationData)
 		return
 	}
 
-	var structNames, funcNames []string
-	for name, entries := range data {
+	var structKeys, funcKeys []string
+	for key, entries := range data {
 		for _, entry := range entries {
 			if entry.Kind == model.KindStruct {
-				structNames = append(structNames, name)
+				structKeys = append(structKeys, key)
 			} else {
-				funcNames = append(funcNames, name)
+				funcKeys = append(funcKeys, key)
 			}
 			break
 		}
 	}
-	sort.Strings(structNames)
-	sort.Strings(funcNames)
+	sort.Strings(structKeys)
+	sort.Strings(funcKeys)
 
 	fmt.Printf("\nInstantiation diversity for %s:\n", projectName)
 
-	if len(structNames) > 0 {
+	if len(structKeys) > 0 {
 		fmt.Println("  [Structs]")
-		for _, name := range structNames {
-			printInstantiationLine(name, data)
+		for _, key := range structKeys {
+			printInstantiationLine(key, data)
 		}
 	}
 
-	if len(funcNames) > 0 {
+	if len(funcKeys) > 0 {
 		fmt.Println("  [Functions]")
-		for _, name := range funcNames {
-			printInstantiationLine(name, data)
+		for _, key := range funcKeys {
+			printInstantiationLine(key, data)
 		}
 	}
 }
 
-func printInstantiationLine(name string, data model.InstantiationData) {
-	concrete := data.ConcreteEntries(name)
-	parametric := data.ParametricEntries(name)
+func printInstantiationLine(key string, data model.InstantiationData) {
+	concrete := data.ConcreteEntries(key)
+	parametric := data.ParametricEntries(key)
+
+	displayName := key
+	for _, entry := range data[key] {
+		displayName = entry.Name
+		break
+	}
 
 	parts := []string{}
 	if len(concrete) > 0 {
@@ -148,7 +154,7 @@ func printInstantiationLine(name string, data model.InstantiationData) {
 	if len(parametric) > 0 {
 		parts = append(parts, fmt.Sprintf("%d parametric [%s]", len(parametric), strings.Join(parametric, ", ")))
 	}
-	fmt.Printf("    %s: %s\n", name, strings.Join(parts, " + "))
+	fmt.Printf("    %s: %s\n", displayName, strings.Join(parts, " + "))
 }
 
 func PrintCountersSummary(counters model.GenericCounters, title string) {

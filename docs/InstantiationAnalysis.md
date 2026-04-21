@@ -13,7 +13,7 @@ Es werden zwei Dimensionen erfasst:
 
 Die Analyse nutzt Go's `go/types`-Paket mit `types.Info.Instances`. Dieses Map wird beim Type-Checking befüllt und enthält für jeden `*ast.Ident` im AST, der eine generische Instanziierung darstellt, die zugehörigen Typ-Argumente.
 
-Der `InstantiationCheck` (in `checks/instantiation_checks.go`) iteriert über alle `*ast.Ident`-Knoten im AST und prüft:
+Der `InstantiationDiversityCheck` (in `checks/instantiation_checks.go`) iteriert über alle `*ast.Ident`-Knoten im AST und prüft:
 
 1. Ist dieser Identifier in `types.Info.Instances` vorhanden?
 2. Ist der zugehörige generische Typ/die Funktion **lokal definiert** (nicht aus einer externen Bibliothek)?
@@ -95,13 +95,13 @@ In `generic_counters.csv` stehen für das LocalTestProject:
 | GenericTypeInstantiationInferred | 2 |
 | **Summe** | **15** |
 
-In `instantiation_diversity.csv` ergibt die Summe aller `ConcreteCount + ParametricCount` über alle Zeilen **17**.
+In `generic_counters_instantiation.csv` ergibt die Summe aller `ConcreteCount + ParametricCount` über alle Zeilen **17**.
 
 Diese Diskrepanz ist **korrekt und erwartet**, weil die beiden Dateien unterschiedliche Dinge messen:
 
 **`generic_counters.csv`** zählt **Verwendungsstellen im Code** — also wie oft ein generischer Typ oder eine generische Funktion im Quellcode tatsächlich aufgerufen/instantiiert wird. Parametrische Instantiierungen (z.B. `Box[T]` in einer Methode mit generischem Receiver) sind **keine echten Verwendungsstellen** und werden hier nicht gezählt.
 
-**`instantiation_diversity.csv`** zählt **eindeutige Typ-Argument-Kombinationen** — also wie viele verschiedene Typen für einen generischen Namen beobachtet wurden. Hier werden auch parametrische Einträge mitgezählt, weil sie zeigen, dass ein generischer Typ auch in anderen generischen Kontexten weiterverwendet wird.
+**`generic_counters_instantiation.csv`** zählt **eindeutige Typ-Argument-Kombinationen** — also wie viele verschiedene Typen für einen generischen Namen beobachtet wurden. Hier werden auch parametrische Einträge mitgezählt, weil sie zeigen, dass ein generischer Typ auch in anderen generischen Kontexten weiterverwendet wird.
 
 Die 17 Diversity-Einträge setzen sich zusammen aus:
 

@@ -2,14 +2,13 @@ package checks
 
 import (
 	"go/ast"
-	"strings"
+	"go/types"
 )
 
-func shortTypeName(s string) string {
-	if idx := strings.LastIndex(s, "."); idx >= 0 {
-		return s[idx+1:]
-	}
-	return s
+func unqualifiedTypeName(t types.Type) string {
+	return types.TypeString(t, func(_ *types.Package) string {
+		return "" // omit package path; TypeString keeps the bare type name
+	})
 }
 
 func CollectTypeBoundsInfo(file *ast.File) map[string]TypeBoundInfo {

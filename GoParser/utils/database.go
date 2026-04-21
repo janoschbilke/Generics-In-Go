@@ -43,7 +43,7 @@ func CreateDatabases(config SetupConfiguration) (*DatabaseSet, error) {
 			_ = set.Generics.Close()
 			return nil, err
 		}
-	} else if config.EnableTypeInference && config.OutputFormat == "sqlite" {
+	} else if config.EnableTypeInference {
 		// TODO: SQLite — instantiation diversity as a new table in the existing DB not yet implemented
 	}
 
