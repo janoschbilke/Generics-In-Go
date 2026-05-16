@@ -1,6 +1,7 @@
 package utils
 
 import (
+	"GoParser/model"
 	"archive/zip"
 	"bytes"
 	"context"
@@ -13,9 +14,7 @@ import (
 	"golang.org/x/oauth2"
 )
 
-// fetchGoFilesList lädt das gesamte Repository als ZIP herunter,
-// entpackt alle .go-Dateien und gibt deren Inhalte als []string zurück.
-func FetchGoFilesList(owner, repo, token string) ([]string, error) {
+func FetchGoFilesList(owner, repo, token string) ([]model.FileInfo, error) {
 	ctx := context.Background()
 	var client *github.Client
 	if token != "" {
@@ -26,21 +25,21 @@ func FetchGoFilesList(owner, repo, token string) ([]string, error) {
 		client = github.NewClient(nil)
 	}
 
-	// Standardbranch abfragen (kostet 1 API-Call)
+	// Fetch default branch (1 API call)
 	r, _, err := client.Repositories.Get(ctx, owner, repo)
 	if err != nil {
 		return nil, fmt.Errorf("konnte Repo nicht abrufen: %w", err)
 	}
 	defaultBranch := r.GetDefaultBranch()
 
-	// ZIP-URL zusammensetzen
+	// Build ZIP URL
 	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/zipball/%s", owner, repo, defaultBranch)
 	req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if token != "" {
 		req.Header.Set("Authorization", "token "+token)
 	}
 
-	// ZIP herunterladen
+	// Download ZIP
 	resp, err := client.Client().Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("konnte ZIP nicht laden: %w", err)
@@ -56,27 +55,68 @@ func FetchGoFilesList(owner, repo, token string) ([]string, error) {
 		return nil, fmt.Errorf("konnte ZIP nicht lesen: %w", err)
 	}
 
-	// ZIP entpacken
+	// Unzip
 	zr, err := zip.NewReader(bytes.NewReader(data), int64(len(data)))
 	if err != nil {
 		return nil, fmt.Errorf("konnte ZIP nicht entpacken: %w", err)
 	}
+	
+	prefix := zipTopLevelPrefix(zr)
 
-	var files []string
+	var files []model.FileInfo
 	for _, f := range zr.File {
-		if !f.FileInfo().IsDir() && strings.HasSuffix(f.Name, ".go") {
-			rc, err := f.Open()
-			if err != nil {
-				continue
-			}
-			content, err := io.ReadAll(rc)
-			rc.Close()
-			if err != nil {
-				continue
-			}
-			files = append(files, string(content))
+		if f.FileInfo().IsDir() {
+			continue
 		}
+
+		name := f.Name
+		if prefix != "" && strings.HasPrefix(name, prefix) {
+			name = name[len(prefix):]
+		}
+
+		if !strings.HasSuffix(name, ".go") && name != "go.mod" {
+			continue
+		}
+
+		if isSkippedPath(name) {
+			continue
+		}
+
+		rc, err := f.Open()
+		if err != nil {
+			continue
+		}
+		content, err := io.ReadAll(rc)
+		rc.Close()
+		if err != nil {
+			continue
+		}
+
+		files = append(files, model.FileInfo{
+			Path:    name,
+			Content: string(content),
+		})
 	}
 
 	return files, nil
+}
+
+func zipTopLevelPrefix(zr *zip.Reader) string {
+	for _, f := range zr.File {
+		idx := strings.Index(f.Name, "/")
+		if idx >= 0 {
+			return f.Name[:idx+1]
+		}
+	}
+	return ""
+}
+
+func isSkippedPath(path string) bool {
+	parts := strings.Split(path, "/")
+	for _, p := range parts {
+		if p == "vendor" || p == "node_modules" || p == ".git" || strings.HasPrefix(p, ".") {
+			return true
+		}
+	}
+	return false
 }
