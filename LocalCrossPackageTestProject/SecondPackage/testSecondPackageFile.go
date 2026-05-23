@@ -1,6 +1,6 @@
 package secondpackage
 
-import fp "localtestproject/FirstPackage"
+import fp "localcrosspackagetestproject/FirstPackage"
 
 // UseStackFromFirstPackage instantiates Stack[T] and calls Map[T,R] from
 // FirstPackage.  These are cross-package instantiations – with the current

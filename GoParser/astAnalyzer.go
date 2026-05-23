@@ -133,8 +133,7 @@ func extractTypeInfoForPackages(sortedDirs []string, parsedFilesToAST map[string
 
 	for _, dir := range sortedDirs {
 		pkg := parsedFilesToAST[dir]
-		pkgName := pkg.AstFiles[0].Name.Name
-		typeInfo, typedPkg := performTypeChecking(pkg.Fset, pkg.AstFiles, pkgName, projectImporter)
+		typeInfo, typedPkg := performTypeChecking(pkg.Fset, pkg.AstFiles, pkg.ImportPath, projectImporter)
 		if typedPkg != nil && pkg.ImportPath != "" {
 			projectImporter.AddPackage(pkg.ImportPath, typedPkg)
 		}
@@ -228,7 +227,7 @@ func computeImportPath(moduleName, dir string) string {
 	return moduleName + "/" + dir
 }
 
-func performTypeChecking(fset *token.FileSet, files []*ast.File, pkgName string, imp types.Importer) (*types.Info, *types.Package) {
+func performTypeChecking(fset *token.FileSet, files []*ast.File, importPath string, imp types.Importer) (*types.Info, *types.Package) {
 	conf := types.Config{
 		Importer: imp,
 		Error:    func(err error) {},
@@ -238,6 +237,6 @@ func performTypeChecking(fset *token.FileSet, files []*ast.File, pkgName string,
 		Types:     make(map[ast.Expr]types.TypeAndValue),
 		Instances: make(map[*ast.Ident]types.Instance),
 	}
-	pkg, _ := conf.Check(pkgName, fset, files, info)
+	pkg, _ := conf.Check(importPath, fset, files, info)
 	return info, pkg
 }
