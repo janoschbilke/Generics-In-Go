@@ -29,7 +29,6 @@ type GenericCounters struct {
 	GenericTypeInstantiationExplicit int
 	GenericTypeInstantiationInferred int
 
-	// Erweiterung 5 
-	GenericMethodInstantiationExplicit int
+	// Erweiterung 5
 	GenericMethodInstantiationInferred int
 }

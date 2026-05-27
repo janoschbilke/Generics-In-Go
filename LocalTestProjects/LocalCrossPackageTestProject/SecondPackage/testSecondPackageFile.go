@@ -3,15 +3,18 @@ package secondpackage
 import fp "localcrosspackagetestproject/FirstPackage"
 
 // UseStackFromFirstPackage instantiates Stack[T] and calls Map[T,R] from
-// FirstPackage.  These are cross-package instantiations – with the current
-// single-package LocalGenericTypes they are treated as external and NOT
-// counted.  This file documents the expected behaviour once cross-package
-// support is added.
+// FirstPackage.  These are cross-package instantiations that are correctly
+// counted after the import-path fix in astAnalyzer.go (conf.Check() now
+// receives the full import path instead of the bare package name).
 //
-// Expected counts (after cross-package fix):
-//   GenericTypeInstantiationExplicit  += 2  (Stack[int], Stack[string])
-//   GenericFuncInstantiationExplicit  += 2  (NewStack[int], Map[int,string])
-//   GenericMethodInstantiationInferred += 3  (Push×2, Pop×1 on Stack[int])
+// Expected contributions to project-wide counters (ENABLE_TYPE_INFERENCE=true):
+//   FuncTotal:                          +1  (UseStackFromFirstPackage)
+//   FuncGeneric:                        +0
+//   GenericTypeInstantiationExplicit:   +2  (&fp.Stack[int]{}, &fp.Stack[string]{})
+//   GenericFuncInstantiationExplicit:   +2  (fp.NewStack[string](), fp.Map[int,string](...))
+//   GenericMethodInstantiationInferred: +4  (intStack.Push(1), intStack.Push(2),
+//                                            intStack.Pop(), strStack.Push("hello"))
+//   – all other counters: +0
 func UseStackFromFirstPackage() {
 	// Explicit composite literal: Stack[int]
 	// → GenericTypeInstantiationExplicit (cross-pkg)

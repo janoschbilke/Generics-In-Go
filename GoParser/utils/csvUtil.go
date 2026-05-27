@@ -48,7 +48,7 @@ func GetOwnerAndRepo(filename string) ([][2]string, error) {
 }
 
 func PrintCSVRow(name string, counters model.GenericCounters) {
-	fmt.Printf("%s,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d\n",
+	fmt.Printf("%s,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d\n",
 		name,
 		counters.FuncTotal,
 		counters.FuncGeneric,
@@ -67,13 +67,12 @@ func PrintCSVRow(name string, counters model.GenericCounters) {
 		counters.GenericFuncInstantiationInferred,
 		counters.GenericTypeInstantiationExplicit,
 		counters.GenericTypeInstantiationInferred,
-		counters.GenericMethodInstantiationExplicit,
 		counters.GenericMethodInstantiationInferred,
 	)
 }
 
 func PrintCSVHeader() {
-	fmt.Println("Repository,FuncTotal,FuncGeneric,MethodTotal,MethodWithGenericReceiver,MethodWithGenericReceiverTrivialTypeBound,MethodWithGenericReceiverNonTrivialTypeBound,StructTotal,StructGeneric,StructGenericNonTrivialBound,StructAsTypeBound,TypeDecl,GenericTypeDecl,GenericTypeSet,GenericFuncInstantiationExplicit,GenericFuncInstantiationInferred,GenericTypeInstantiationExplicit,GenericTypeInstantiationInferred,GenericMethodInstantiationExplicit,GenericMethodInstantiationInferred")
+	fmt.Println("Repository,FuncTotal,FuncGeneric,MethodTotal,MethodWithGenericReceiver,MethodWithGenericReceiverTrivialTypeBound,MethodWithGenericReceiverNonTrivialTypeBound,StructTotal,StructGeneric,StructGenericNonTrivialBound,StructAsTypeBound,TypeDecl,GenericTypeDecl,GenericTypeSet,GenericFuncInstantiationExplicit,GenericFuncInstantiationInferred,GenericTypeInstantiationExplicit,GenericTypeInstantiationInferred,GenericMethodInstantiationInferred")
 }
 
 // ComputeCrossRepoAggregation counts how many repositories have at least one occurrence
@@ -185,13 +184,12 @@ func PrintCountersSummary(counters model.GenericCounters, title string) {
 
 	if counters.GenericFuncInstantiationExplicit > 0 || counters.GenericFuncInstantiationInferred > 0 ||
 		counters.GenericTypeInstantiationExplicit > 0 || counters.GenericTypeInstantiationInferred > 0 ||
-		counters.GenericMethodInstantiationExplicit > 0 || counters.GenericMethodInstantiationInferred > 0 {
+		counters.GenericMethodInstantiationInferred > 0 {
 		fmt.Println("\nGeneric Instantiations:")
-		fmt.Printf("  GenericFuncInstantiationExplicit:   %v\n", counters.GenericFuncInstantiationExplicit)
-		fmt.Printf("  GenericFuncInstantiationInferred:   %v\n", counters.GenericFuncInstantiationInferred)
-		fmt.Printf("  GenericTypeInstantiationExplicit:   %v\n", counters.GenericTypeInstantiationExplicit)
-		fmt.Printf("  GenericTypeInstantiationInferred:   %v\n", counters.GenericTypeInstantiationInferred)
-		fmt.Printf("  GenericMethodInstantiationExplicit: %v\n", counters.GenericMethodInstantiationExplicit)
+		fmt.Printf("  GenericFuncInstantiationExplicit:  %v\n", counters.GenericFuncInstantiationExplicit)
+		fmt.Printf("  GenericFuncInstantiationInferred:  %v\n", counters.GenericFuncInstantiationInferred)
+		fmt.Printf("  GenericTypeInstantiationExplicit:  %v\n", counters.GenericTypeInstantiationExplicit)
+		fmt.Printf("  GenericTypeInstantiationInferred:  %v\n", counters.GenericTypeInstantiationInferred)
 		fmt.Printf("  GenericMethodInstantiationInferred: %v\n", counters.GenericMethodInstantiationInferred)
 	}
 }
