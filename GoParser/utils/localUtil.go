@@ -1,22 +1,20 @@
 package utils
 
 import (
+	"GoParser/model"
 	"os"
 	"path/filepath"
 	"strings"
 )
 
-// fetchLocalGoFiles durchläuft ein lokales Verzeichnis rekursiv
-// und sammelt alle .go-Dateien (außer vendor, .git, etc.)
-func FetchLocalGoFiles(projectPath string) ([]string, error) {
-	var files []string
+func FetchLocalGoFiles(projectPath string) ([]model.FileInfo, error) {
+	var files []model.FileInfo
 
 	err := filepath.Walk(projectPath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
 
-		// Überspringe spezielle Verzeichnisse
 		if info.IsDir() {
 			dirName := info.Name()
 			if dirName == "vendor" || dirName == ".git" || dirName == "node_modules" || strings.HasPrefix(dirName, ".") {
@@ -25,13 +23,19 @@ func FetchLocalGoFiles(projectPath string) ([]string, error) {
 			return nil
 		}
 
-		// Nur .go-Dateien sammeln
-		if strings.HasSuffix(path, ".go") {
+		if strings.HasSuffix(path, ".go") || filepath.Base(path) == "go.mod" {
 			content, err := os.ReadFile(path)
 			if err != nil {
 				return err
 			}
-			files = append(files, string(content))
+			relPath, err := filepath.Rel(projectPath, path)
+			if err != nil {
+				relPath = path
+			}
+			files = append(files, model.FileInfo{
+				Path:    filepath.ToSlash(relPath),
+				Content: string(content),
+			})
 		}
 
 		return nil

@@ -2,12 +2,13 @@ package model
 
 import "sort"
 
-// InstantiationKind distinguishes between generic structs and generic functions
+// InstantiationKind distinguishes between generic structs, generic functions and generic methods
 type InstantiationKind string
 
 const (
 	KindStruct   InstantiationKind = "struct"
 	KindFunction InstantiationKind = "func"
+	KindMethod   InstantiationKind = "method"
 )
 
 // InstantiationEntry represents a single observed instantiation of a generic type or function
