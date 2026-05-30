@@ -57,7 +57,7 @@ func (a *astAnalyzerImpl) AnalyzeProject(files []model.FileInfo, enableTypeInfer
 	sortedDirs := utils.TopoSortPackages(parsedFilesToAST, moduleName)
 
 	checkedPackages := extractTypeInfoForPackages(sortedDirs, parsedFilesToAST, projectImporter)
-	
+
 	// Collect project-wide symbols for all packages to enable cross-package checks and store package-specific symbols for efficient access during checks (symbolsByPackage as caching mechanism)
 	projectLocalGenerics, projectLocalGenericTypes, projectImportPaths, symbolsByPackage := collectProjectSymbols(checkedPackages)
 

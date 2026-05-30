@@ -36,7 +36,6 @@ func CollectAll(file *ast.File) (map[string]TypeBoundInfo, map[string]*GenericDe
 				}
 				isTrivial := false
 
-
 				if ident, ok := tp.Type.(*ast.Ident); ok && ident.Name == "any" {
 					isTrivial = true
 				}

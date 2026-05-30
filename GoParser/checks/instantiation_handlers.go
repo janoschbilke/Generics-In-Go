@@ -25,20 +25,16 @@ type InstantiationResult struct {
 	IsExplicit bool
 }
 
-// isProjectPkg returns true when pkgPath belongs to the analysed project.
 func isProjectPkg(pkgPath string, ctx *InstantiationContext) bool {
 	return ctx.ProjectImportPaths != nil && ctx.ProjectImportPaths[pkgPath]
 }
 
-// isLocalGeneric returns true when name is a locally-defined generic function or type.
 func isLocalGeneric(name string, ctx *InstantiationContext) bool {
 	_, inFuncs := ctx.LocalGenerics[name]
 	_, inTypes := ctx.LocalGenericTypes[name]
 	return inFuncs || inTypes
 }
 
-// isProjectGeneric returns true when the qualified key "<pkgPath>.<name>" is a
-// project-internal generic function or type.
 func isProjectGeneric(pkgPath, name string, ctx *InstantiationContext) bool {
 	key := pkgPath + "." + name
 	_, inFuncs := ctx.ProjectLocalGenerics[key]
@@ -46,43 +42,28 @@ func isProjectGeneric(pkgPath, name string, ctx *InstantiationContext) bool {
 	return inFuncs || inTypes
 }
 
-// resolveIndexExprLocality decides whether an IndexExpr (explicit single type-arg)
-// is external.  It handles three shapes:
-//
-//  1. pkg.Func[T](...)  – X is SelectorExpr whose X is a PkgName
-//     → external if pkg is not a project-internal package
-//     → internal if pkg is project-internal AND Func is a known generic
-//
-//  2. receiver.Method[T](...) – X is SelectorExpr whose X is a value
-//     → internal if the receiver's named type is local or project-internal
-//
-//  3. Func[T](...)  – X is a plain Ident
-//     → internal if Func is in LocalGenerics / LocalGenericTypes
 func resolveIndexExprLocality(x ast.Expr, ctx *InstantiationContext) (isExternal bool) {
 	selExpr, isSel := x.(*ast.SelectorExpr)
 	if !isSel {
-		// Plain ident: Func[T](...)
 		if ident, ok := x.(*ast.Ident); ok {
 			return !isLocalGeneric(ident.Name, ctx)
 		}
 		return true
 	}
 
-	// SelectorExpr – distinguish package-qualified vs method call
 	if ctx.TypeInfo != nil {
 		if ident, ok := selExpr.X.(*ast.Ident); ok {
 			if obj, ok := ctx.TypeInfo.Uses[ident]; ok {
 				if pkgName, isPkg := obj.(*types.PkgName); isPkg {
-					// Shape 1: pkg.Func[T]
 					pkgPath := pkgName.Imported().Path()
 					if isProjectPkg(pkgPath, ctx) {
 						return !isProjectGeneric(pkgPath, selExpr.Sel.Name, ctx)
 					}
-					return true // external package
+					return true
 				}
 			}
 		}
-		// Shape 2: receiver.Method[T]
+
 		if xTV, ok := ctx.TypeInfo.Types[selExpr.X]; ok {
 			recvType := xTV.Type
 			if ptr, ok := recvType.(*types.Pointer); ok {
@@ -102,9 +83,7 @@ func resolveIndexExprLocality(x ast.Expr, ctx *InstantiationContext) (isExternal
 	return true
 }
 
-// ── IndexExprHandler ──────────────────────────────────────────────────────────
 // Handles explicit single-type-arg instantiations: func[T](...) or Type[T]{...}
-
 type IndexExprHandler struct{}
 
 func (h *IndexExprHandler) CanHandle(expr ast.Expr) bool {
@@ -118,9 +97,7 @@ func (h *IndexExprHandler) IsExternal(expr ast.Expr, ctx *InstantiationContext) 
 	return resolveIndexExprLocality(expr.(*ast.IndexExpr).X, ctx)
 }
 
-// ── IndexListExprHandler ──────────────────────────────────────────────────────
 // Handles explicit multi-type-arg instantiations: func[T1, T2](...) or Type[T1, T2]{...}
-
 type IndexListExprHandler struct{}
 
 func (h *IndexListExprHandler) CanHandle(expr ast.Expr) bool {
@@ -134,9 +111,7 @@ func (h *IndexListExprHandler) IsExternal(expr ast.Expr, ctx *InstantiationConte
 	return resolveIndexExprLocality(expr.(*ast.IndexListExpr).X, ctx)
 }
 
-// ── InferredIdentHandler ──────────────────────────────────────────────────────
 // Handles inferred instantiations: func(...) where the type is inferred.
-
 type InferredIdentHandler struct{}
 
 func (h *InferredIdentHandler) CanHandle(expr ast.Expr) bool {
@@ -156,9 +131,7 @@ func (h *InferredIdentHandler) HasInstance(ident *ast.Ident, context *Instantiat
 	return hasInstance
 }
 
-// ── InferredSelectorHandler ───────────────────────────────────────────────────
 // Handles selector expressions: pkg.Func(...) or receiver.Method(...).
-
 type InferredSelectorHandler struct{}
 
 func (h *InferredSelectorHandler) CanHandle(expr ast.Expr) bool {
