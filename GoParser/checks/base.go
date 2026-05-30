@@ -13,6 +13,11 @@ type AnalysisContext struct {
 	TypeInfo          *types.Info
 	File              *ast.File
 	Instantiations    model.InstantiationData // populated by InstantiationDiversityCheck
+
+	ProjectLocalGenerics     map[string]*GenericDefinition
+	ProjectLocalGenericTypes map[string]bool
+	// Set of import paths that belong to the analysed project
+	ProjectImportPaths map[string]bool
 }
 
 type TypeBoundInfo struct {
@@ -21,9 +26,10 @@ type TypeBoundInfo struct {
 }
 
 type GenericDefinition struct {
-	Name          string
-	IsMethod      bool
-	NumTypeParams int
+	Name             string
+	IsMethod         bool
+	NumTypeParams    int
+	ReceiverTypeName string
 }
 
 type ASTCheck interface {

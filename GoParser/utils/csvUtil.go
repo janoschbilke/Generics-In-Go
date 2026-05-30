@@ -48,7 +48,7 @@ func GetOwnerAndRepo(filename string) ([][2]string, error) {
 }
 
 func PrintCSVRow(name string, counters model.GenericCounters) {
-	fmt.Printf("%s,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d\n",
+	fmt.Printf("%s,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d\n",
 		name,
 		counters.FuncTotal,
 		counters.FuncGeneric,
@@ -67,11 +67,12 @@ func PrintCSVRow(name string, counters model.GenericCounters) {
 		counters.GenericFuncInstantiationInferred,
 		counters.GenericTypeInstantiationExplicit,
 		counters.GenericTypeInstantiationInferred,
+		counters.GenericMethodInstantiationInferred,
 	)
 }
 
 func PrintCSVHeader() {
-	fmt.Println("Repository,FuncTotal,FuncGeneric,MethodTotal,MethodWithGenericReceiver,MethodWithGenericReceiverTrivialTypeBound,MethodWithGenericReceiverNonTrivialTypeBound,StructTotal,StructGeneric,StructGenericNonTrivialBound,StructAsTypeBound,TypeDecl,GenericTypeDecl,GenericTypeSet,GenericFuncInstantiationExplicit,GenericFuncInstantiationInferred,GenericTypeInstantiationExplicit,GenericTypeInstantiationInferred")
+	fmt.Println("Repository,FuncTotal,FuncGeneric,MethodTotal,MethodWithGenericReceiver,MethodWithGenericReceiverTrivialTypeBound,MethodWithGenericReceiverNonTrivialTypeBound,StructTotal,StructGeneric,StructGenericNonTrivialBound,StructAsTypeBound,TypeDecl,GenericTypeDecl,GenericTypeSet,GenericFuncInstantiationExplicit,GenericFuncInstantiationInferred,GenericTypeInstantiationExplicit,GenericTypeInstantiationInferred,GenericMethodInstantiationInferred")
 }
 
 // ComputeCrossRepoAggregation counts how many repositories have at least one occurrence
@@ -106,19 +107,23 @@ func PrintInstantiationSummary(projectName string, data model.InstantiationData)
 		return
 	}
 
-	var structKeys, funcKeys []string
+	var structKeys, funcKeys, methodKeys []string
 	for key, entries := range data {
 		for _, entry := range entries {
-			if entry.Kind == model.KindStruct {
+			switch entry.Kind {
+			case model.KindStruct:
 				structKeys = append(structKeys, key)
-			} else {
+			case model.KindFunction:
 				funcKeys = append(funcKeys, key)
+			case model.KindMethod:
+				methodKeys = append(methodKeys, key)
 			}
 			break
 		}
 	}
 	sort.Strings(structKeys)
 	sort.Strings(funcKeys)
+	sort.Strings(methodKeys)
 
 	fmt.Printf("\nInstantiation diversity for %s:\n", projectName)
 
@@ -132,6 +137,13 @@ func PrintInstantiationSummary(projectName string, data model.InstantiationData)
 	if len(funcKeys) > 0 {
 		fmt.Println("  [Functions]")
 		for _, key := range funcKeys {
+			printInstantiationLine(key, data)
+		}
+	}
+
+	if len(methodKeys) > 0 {
+		fmt.Println("  [Methods on generic types]")
+		for _, key := range methodKeys {
 			printInstantiationLine(key, data)
 		}
 	}
@@ -171,11 +183,13 @@ func PrintCountersSummary(counters model.GenericCounters, title string) {
 	fmt.Printf("GenericTypeSet: %v\n", counters.GenericTypeSet)
 
 	if counters.GenericFuncInstantiationExplicit > 0 || counters.GenericFuncInstantiationInferred > 0 ||
-		counters.GenericTypeInstantiationExplicit > 0 || counters.GenericTypeInstantiationInferred > 0 {
+		counters.GenericTypeInstantiationExplicit > 0 || counters.GenericTypeInstantiationInferred > 0 ||
+		counters.GenericMethodInstantiationInferred > 0 {
 		fmt.Println("\nGeneric Instantiations:")
-		fmt.Printf("  GenericFuncInstantiationExplicit: %v\n", counters.GenericFuncInstantiationExplicit)
-		fmt.Printf("  GenericFuncInstantiationInferred: %v\n", counters.GenericFuncInstantiationInferred)
-		fmt.Printf("  GenericTypeInstantiationExplicit: %v\n", counters.GenericTypeInstantiationExplicit)
-		fmt.Printf("  GenericTypeInstantiationInferred: %v\n", counters.GenericTypeInstantiationInferred)
+		fmt.Printf("  GenericFuncInstantiationExplicit:  %v\n", counters.GenericFuncInstantiationExplicit)
+		fmt.Printf("  GenericFuncInstantiationInferred:  %v\n", counters.GenericFuncInstantiationInferred)
+		fmt.Printf("  GenericTypeInstantiationExplicit:  %v\n", counters.GenericTypeInstantiationExplicit)
+		fmt.Printf("  GenericTypeInstantiationInferred:  %v\n", counters.GenericTypeInstantiationInferred)
+		fmt.Printf("  GenericMethodInstantiationInferred: %v\n", counters.GenericMethodInstantiationInferred)
 	}
 }

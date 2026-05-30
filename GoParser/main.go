@@ -9,10 +9,10 @@ import (
 	utils "GoParser/utils"
 )
 
-// AnalysisJob represents a single unit of analysis work: a named project and a way to fetch its files. (In preparation for upcoming parallelization)
+// AnalysisJob represents a single unit of analysis work: a named project and a way to fetch its files.
 type AnalysisJob struct {
 	Name       string
-	FetchFiles func() ([]string, error)
+	FetchFiles func() ([]model.FileInfo, error)
 }
 
 func main() {
@@ -47,10 +47,10 @@ func main() {
 		projectName := "local/" + filepath.Base(config.LocalProject)
 		jobs = []AnalysisJob{{
 			Name: projectName,
-			FetchFiles: func() ([]string, error) {
+			FetchFiles: func() ([]model.FileInfo, error) {
 				files, err := utils.FetchLocalGoFiles(config.LocalProject)
 				if err == nil {
-					log.Printf("Found %d .go files in local project", len(files))
+					log.Printf("Found %d files in local project", len(files))
 				}
 				return files, err
 			},
@@ -65,7 +65,7 @@ func main() {
 			owner, repoName := repo[0], repo[1]
 			jobs = append(jobs, AnalysisJob{
 				Name: owner + "/" + repoName,
-				FetchFiles: func() ([]string, error) {
+				FetchFiles: func() ([]model.FileInfo, error) {
 					return utils.FetchGoFilesList(owner, repoName, config.Token)
 				},
 			})
@@ -98,30 +98,18 @@ func main() {
 	}
 }
 
-func analyzeFiles(files []string, analyzer ASTAnalyzer, enableTypeInference bool) (model.GenericCounters, model.InstantiationData) {
-	counters := model.GenericCounters{}
-	allInstantiations := make(model.InstantiationData)
-	for _, file := range files {
-		counts, instantiations, err := analyzer.AnalyzeFileWithConfig(file, enableTypeInference)
-		if err != nil {
-			log.Println("Error:", err)
-		} else {
-			aggregateCounters(&counters, counts)
-			allInstantiations.Merge(instantiations)
-		}
-	}
-	return counters, allInstantiations
-}
-
-// processJob fetches files for a job, analyzes them, prints a CSV row, and saves all results to the databases.
-// It returns the aggregated counters and instantiation data so callers can print summaries.
+// processJob fetches files for a job, analyses the whole project at once,
+// prints a CSV row, and saves all results to the databases.
 func processJob(job AnalysisJob, analyzer ASTAnalyzer, dbs *utils.DatabaseSet, enableTypeInference bool) (model.GenericCounters, model.InstantiationData, error) {
 	files, err := job.FetchFiles()
 	if err != nil {
 		return model.GenericCounters{}, nil, err
 	}
 
-	counters, instantiations := analyzeFiles(files, analyzer, enableTypeInference)
+	counters, instantiations, err := analyzer.AnalyzeProject(files, enableTypeInference)
+	if err != nil {
+		return model.GenericCounters{}, nil, fmt.Errorf("analysis failed: %w", err)
+	}
 	counters.Repository = job.Name
 
 	utils.PrintCSVRow(job.Name, counters)
@@ -137,25 +125,4 @@ func processJob(job AnalysisJob, analyzer ASTAnalyzer, dbs *utils.DatabaseSet, e
 	}
 
 	return counters, instantiations, nil
-}
-
-func aggregateCounters(target *model.GenericCounters, source model.GenericCounters) {
-	target.FuncTotal += source.FuncTotal
-	target.FuncGeneric += source.FuncGeneric
-	target.MethodTotal += source.MethodTotal
-	target.MethodWithGenericReceiver += source.MethodWithGenericReceiver
-	target.MethodWithGenericReceiverTrivialTypeBound += source.MethodWithGenericReceiverTrivialTypeBound
-	target.MethodWithGenericReceiverNonTrivialTypeBound += source.MethodWithGenericReceiverNonTrivialTypeBound
-	target.StructTotal += source.StructTotal
-	target.StructGeneric += source.StructGeneric
-	target.StructGenericBound += source.StructGenericBound
-	target.StructAsTypeBound += source.StructAsTypeBound
-	target.TypeDecl += source.TypeDecl
-	target.GenericTypeDecl += source.GenericTypeDecl
-	target.GenericTypeSet += source.GenericTypeSet
-
-	target.GenericFuncInstantiationExplicit += source.GenericFuncInstantiationExplicit
-	target.GenericFuncInstantiationInferred += source.GenericFuncInstantiationInferred
-	target.GenericTypeInstantiationExplicit += source.GenericTypeInstantiationExplicit
-	target.GenericTypeInstantiationInferred += source.GenericTypeInstantiationInferred
 }

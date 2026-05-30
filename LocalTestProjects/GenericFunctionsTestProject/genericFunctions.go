@@ -1,7 +1,5 @@
 package localtestproject
 
-// Generic Function Examples
-
 func GenericMax[T int | float64](a, b T) T {
 	if a > b {
 		return a

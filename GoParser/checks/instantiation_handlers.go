@@ -12,9 +12,12 @@ type ExpressionHandler interface {
 }
 
 type InstantiationContext struct {
-	TypeInfo          *types.Info
-	LocalGenerics     map[string]*GenericDefinition
-	LocalGenericTypes map[string]bool
+	TypeInfo                 *types.Info
+	LocalGenerics            map[string]*GenericDefinition
+	LocalGenericTypes        map[string]bool
+	ProjectLocalGenerics     map[string]*GenericDefinition
+	ProjectLocalGenericTypes map[string]bool
+	ProjectImportPaths       map[string]bool
 }
 
 type InstantiationResult struct {
@@ -22,6 +25,65 @@ type InstantiationResult struct {
 	IsExplicit bool
 }
 
+func isProjectPkg(pkgPath string, ctx *InstantiationContext) bool {
+	return ctx.ProjectImportPaths != nil && ctx.ProjectImportPaths[pkgPath]
+}
+
+func isLocalGeneric(name string, ctx *InstantiationContext) bool {
+	_, inFuncs := ctx.LocalGenerics[name]
+	_, inTypes := ctx.LocalGenericTypes[name]
+	return inFuncs || inTypes
+}
+
+func isProjectGeneric(pkgPath, name string, ctx *InstantiationContext) bool {
+	key := pkgPath + "." + name
+	_, inFuncs := ctx.ProjectLocalGenerics[key]
+	_, inTypes := ctx.ProjectLocalGenericTypes[key]
+	return inFuncs || inTypes
+}
+
+func resolveIndexExprLocality(x ast.Expr, ctx *InstantiationContext) (isExternal bool) {
+	selExpr, isSel := x.(*ast.SelectorExpr)
+	if !isSel {
+		if ident, ok := x.(*ast.Ident); ok {
+			return !isLocalGeneric(ident.Name, ctx)
+		}
+		return true
+	}
+
+	if ctx.TypeInfo != nil {
+		if ident, ok := selExpr.X.(*ast.Ident); ok {
+			if obj, ok := ctx.TypeInfo.Uses[ident]; ok {
+				if pkgName, isPkg := obj.(*types.PkgName); isPkg {
+					pkgPath := pkgName.Imported().Path()
+					if isProjectPkg(pkgPath, ctx) {
+						return !isProjectGeneric(pkgPath, selExpr.Sel.Name, ctx)
+					}
+					return true
+				}
+			}
+		}
+
+		if xTV, ok := ctx.TypeInfo.Types[selExpr.X]; ok {
+			recvType := xTV.Type
+			if ptr, ok := recvType.(*types.Pointer); ok {
+				recvType = ptr.Elem()
+			}
+			if named, ok := recvType.(*types.Named); ok {
+				typeName := named.Obj().Name()
+				if ctx.LocalGenericTypes[typeName] {
+					return false
+				}
+				if named.Obj().Pkg() != nil && isProjectPkg(named.Obj().Pkg().Path(), ctx) {
+					return false
+				}
+			}
+		}
+	}
+	return true
+}
+
+// Handles explicit single-type-arg instantiations: func[T](...) or Type[T]{...}
 type IndexExprHandler struct{}
 
 func (h *IndexExprHandler) CanHandle(expr ast.Expr) bool {
@@ -29,23 +91,13 @@ func (h *IndexExprHandler) CanHandle(expr ast.Expr) bool {
 	return ok
 }
 
-func (h *IndexExprHandler) IsExplicit() bool {
-	return true
+func (h *IndexExprHandler) IsExplicit() bool { return true }
+
+func (h *IndexExprHandler) IsExternal(expr ast.Expr, ctx *InstantiationContext) bool {
+	return resolveIndexExprLocality(expr.(*ast.IndexExpr).X, ctx)
 }
 
-func (h *IndexExprHandler) IsExternal(expr ast.Expr, context *InstantiationContext) bool {
-	indexExpr := expr.(*ast.IndexExpr)
-	if _, ok := indexExpr.X.(*ast.SelectorExpr); ok {
-		return true
-	}
-	if ident, ok := indexExpr.X.(*ast.Ident); ok {
-		_, existsInFuncs := context.LocalGenerics[ident.Name]
-		_, existsInTypes := context.LocalGenericTypes[ident.Name]
-		return !existsInFuncs && !existsInTypes
-	}
-	return false
-}
-
+// Handles explicit multi-type-arg instantiations: func[T1, T2](...) or Type[T1, T2]{...}
 type IndexListExprHandler struct{}
 
 func (h *IndexListExprHandler) CanHandle(expr ast.Expr) bool {
@@ -53,23 +105,13 @@ func (h *IndexListExprHandler) CanHandle(expr ast.Expr) bool {
 	return ok
 }
 
-func (h *IndexListExprHandler) IsExplicit() bool {
-	return true
+func (h *IndexListExprHandler) IsExplicit() bool { return true }
+
+func (h *IndexListExprHandler) IsExternal(expr ast.Expr, ctx *InstantiationContext) bool {
+	return resolveIndexExprLocality(expr.(*ast.IndexListExpr).X, ctx)
 }
 
-func (h *IndexListExprHandler) IsExternal(expr ast.Expr, context *InstantiationContext) bool {
-	indexListExpr := expr.(*ast.IndexListExpr)
-	if _, ok := indexListExpr.X.(*ast.SelectorExpr); ok {
-		return true
-	}
-	if ident, ok := indexListExpr.X.(*ast.Ident); ok {
-		_, existsInFuncs := context.LocalGenerics[ident.Name]
-		_, existsInTypes := context.LocalGenericTypes[ident.Name]
-		return !existsInFuncs && !existsInTypes
-	}
-	return false
-}
-
+// Handles inferred instantiations: func(...) where the type is inferred.
 type InferredIdentHandler struct{}
 
 func (h *InferredIdentHandler) CanHandle(expr ast.Expr) bool {
@@ -77,15 +119,11 @@ func (h *InferredIdentHandler) CanHandle(expr ast.Expr) bool {
 	return ok
 }
 
-func (h *InferredIdentHandler) IsExplicit() bool {
-	return false
-}
+func (h *InferredIdentHandler) IsExplicit() bool { return false }
 
-func (h *InferredIdentHandler) IsExternal(expr ast.Expr, context *InstantiationContext) bool {
+func (h *InferredIdentHandler) IsExternal(expr ast.Expr, ctx *InstantiationContext) bool {
 	ident := expr.(*ast.Ident)
-	_, existsInFuncs := context.LocalGenerics[ident.Name]
-	_, existsInTypes := context.LocalGenericTypes[ident.Name]
-	return !existsInFuncs && !existsInTypes
+	return !isLocalGeneric(ident.Name, ctx)
 }
 
 func (h *InferredIdentHandler) HasInstance(ident *ast.Ident, context *InstantiationContext) bool {
@@ -93,6 +131,7 @@ func (h *InferredIdentHandler) HasInstance(ident *ast.Ident, context *Instantiat
 	return hasInstance
 }
 
+// Handles selector expressions: pkg.Func(...) or receiver.Method(...).
 type InferredSelectorHandler struct{}
 
 func (h *InferredSelectorHandler) CanHandle(expr ast.Expr) bool {
@@ -100,11 +139,45 @@ func (h *InferredSelectorHandler) CanHandle(expr ast.Expr) bool {
 	return ok
 }
 
-func (h *InferredSelectorHandler) IsExplicit() bool {
-	return false
-}
+func (h *InferredSelectorHandler) IsExplicit() bool { return false }
 
-func (h *InferredSelectorHandler) IsExternal(expr ast.Expr, context *InstantiationContext) bool {
+func (h *InferredSelectorHandler) IsExternal(expr ast.Expr, ctx *InstantiationContext) bool {
+	if ctx.TypeInfo == nil {
+		return true
+	}
+	selExpr := expr.(*ast.SelectorExpr)
+
+	obj, ok := ctx.TypeInfo.Uses[selExpr.Sel]
+	if !ok {
+		return true
+	}
+	fn, ok := obj.(*types.Func)
+	if !ok {
+		return true // not a function
+	}
+	sig, ok := fn.Type().(*types.Signature)
+	if !ok || sig.Recv() == nil {
+		return true
+	}
+
+	// Dereference pointer receiver
+	recvType := sig.Recv().Type()
+	if ptr, ok := recvType.(*types.Pointer); ok {
+		recvType = ptr.Elem()
+	}
+	named, ok := recvType.(*types.Named)
+	if !ok {
+		return true
+	}
+
+	// Local package
+	if ctx.LocalGenericTypes[named.Obj().Name()] {
+		return false
+	}
+	// Project-internal package
+	if named.Obj().Pkg() != nil && isProjectPkg(named.Obj().Pkg().Path(), ctx) {
+		return false
+	}
 	return true
 }
 
