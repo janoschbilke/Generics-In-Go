@@ -57,48 +57,12 @@ func (a *astAnalyzerImpl) AnalyzeProject(files []model.FileInfo, enableTypeInfer
 	sortedDirs := utils.TopoSortPackages(parsedFilesToAST, moduleName)
 
 	checkedPackages := extractTypeInfoForPackages(sortedDirs, parsedFilesToAST, projectImporter)
-
-	// Build project-wide maps (qualified: "<import/path>.<Name>") so that
-	// cross-package instantiations can be recognised by the handlers.
-	projectLocalGenerics := make(map[string]*checks.GenericDefinition)
-	projectLocalGenericTypes := make(map[string]bool)
-	projectImportPaths := make(map[string]bool)
-	for _, cp := range checkedPackages {
-		if cp.pkg.ImportPath != "" {
-			projectImportPaths[cp.pkg.ImportPath] = true
-		}
-		for _, astFile := range cp.pkg.AstFiles {
-			_, fg, ft := checks.CollectAll(astFile)
-			for k, v := range fg {
-				projectLocalGenerics[cp.pkg.ImportPath+"."+k] = v
-			}
-			for k := range ft {
-				projectLocalGenericTypes[cp.pkg.ImportPath+"."+k] = true
-			}
-		}
-	}
+	
+	// Collect project-wide symbols for all packages to enable cross-package checks and store package-specific symbols for efficient access during checks (symbolsByPackage as caching mechanism)
+	projectLocalGenerics, projectLocalGenericTypes, projectImportPaths, symbolsByPackage := collectProjectSymbols(checkedPackages)
 
 	for _, cp := range checkedPackages {
-		pkgLocalGenerics := make(map[string]*checks.GenericDefinition)
-		pkgLocalGenericTypes := make(map[string]bool)
-		var pkgTypeBoundsInfo map[string]checks.TypeBoundInfo
-
-		for _, astFile := range cp.pkg.AstFiles {
-			tbi, fg, ft := checks.CollectAll(astFile)
-			for k, v := range fg {
-				pkgLocalGenerics[k] = v
-			}
-			for k, v := range ft {
-				pkgLocalGenericTypes[k] = v
-			}
-			if pkgTypeBoundsInfo == nil {
-				pkgTypeBoundsInfo = tbi
-			} else {
-				for k, v := range tbi {
-					pkgTypeBoundsInfo[k] = v
-				}
-			}
-		}
+		pc := symbolsByPackage[cp.pkg.Dir]
 
 		allChecks := []checks.ASTCheck{}
 		allChecks = append(allChecks, getBasicChecks()...)
@@ -107,9 +71,9 @@ func (a *astAnalyzerImpl) AnalyzeProject(files []model.FileInfo, enableTypeInfer
 
 		for _, astFile := range cp.pkg.AstFiles {
 			ctx := &checks.AnalysisContext{
-				TypeBoundsInfo:           pkgTypeBoundsInfo,
-				LocalGenerics:            pkgLocalGenerics,
-				LocalGenericTypes:        pkgLocalGenericTypes,
+				TypeBoundsInfo:           pc.typeBoundsInfo,
+				LocalGenerics:            pc.localGenerics,
+				LocalGenericTypes:        pc.localGenericTypes,
 				TypeInfo:                 cp.typeInfo,
 				ProjectLocalGenerics:     projectLocalGenerics,
 				ProjectLocalGenericTypes: projectLocalGenericTypes,
@@ -140,6 +104,59 @@ func extractTypeInfoForPackages(sortedDirs []string, parsedFilesToAST map[string
 		checked = append(checked, checkedPkg{pkg: pkg, typeInfo: typeInfo})
 	}
 	return checked
+}
+
+type packageSymbols struct {
+	localGenerics     map[string]*checks.GenericDefinition
+	localGenericTypes map[string]bool
+	typeBoundsInfo    map[string]checks.TypeBoundInfo
+}
+
+func collectProjectSymbols(checkedPackages []checkedPkg) (map[string]*checks.GenericDefinition, map[string]bool, map[string]bool, map[string]*packageSymbols) {
+	projectLocalGenerics := make(map[string]*checks.GenericDefinition)
+	projectLocalGenericTypes := make(map[string]bool)
+	projectImportPaths := make(map[string]bool)
+	symbolsByPackage := make(map[string]*packageSymbols)
+
+	for _, cp := range checkedPackages {
+		if cp.pkg.ImportPath != "" {
+			projectImportPaths[cp.pkg.ImportPath] = true
+		}
+
+		pc := &packageSymbols{
+			localGenerics:     make(map[string]*checks.GenericDefinition),
+			localGenericTypes: make(map[string]bool),
+		}
+
+		for _, astFile := range cp.pkg.AstFiles {
+			tbi, fg, ft := checks.CollectAll(astFile)
+
+			for k, v := range fg {
+				pc.localGenerics[k] = v
+			}
+			for k, v := range ft {
+				pc.localGenericTypes[k] = v
+			}
+			if pc.typeBoundsInfo == nil {
+				pc.typeBoundsInfo = tbi
+			} else {
+				for k, v := range tbi {
+					pc.typeBoundsInfo[k] = v
+				}
+			}
+
+			if cp.pkg.ImportPath != "" {
+				for k, v := range fg {
+					projectLocalGenerics[cp.pkg.ImportPath+"."+k] = v
+				}
+				for k := range ft {
+					projectLocalGenericTypes[cp.pkg.ImportPath+"."+k] = true
+				}
+			}
+		}
+		symbolsByPackage[cp.pkg.Dir] = pc
+	}
+	return projectLocalGenerics, projectLocalGenericTypes, projectImportPaths, symbolsByPackage
 }
 
 func getBasicChecks() []checks.ASTCheck {
