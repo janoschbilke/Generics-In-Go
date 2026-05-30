@@ -6,26 +6,28 @@ Diese Dokumentation beschreibt alle analysierten Metriken und wie sie ermittelt 
 
 Der AST-Analyzer zählt folgende Metriken in Go-Projekten:
 
-| Metrik                                       | Beschreibung                                                                  |
-| -------------------------------------------- | ----------------------------------------------------------------------------- |
-| FuncTotal                                    | Gesamtanzahl aller Funktionen                                                 |
-| FuncGeneric                                  | Anzahl generischer Funktionen                                                 |
-| MethodTotal                                  | Gesamtanzahl aller Methoden                                                   |
-| MethodWithGenericReceiver                    | Anzahl Methoden mit generischem Receiver                                      |
-| MethodWithGenericReceiverTrivialTypeBound    | Anzahl Methoden mit generischem Receiver und trivialem Type Bound             |
-| MethodWithGenericReceiverNonTrivialTypeBound | Anzahl Methoden mit generischem Receiver und non-trivial Type Bound           |
-| StructTotal                                  | Gesamtanzahl aller Structs                                                    |
-| StructGeneric                                | Anzahl generischer Structs                                                    |
-| StructGenericBound                           | Anzahl generischer Structs mit non-trivial Type Bounds                        |
-| StructAsTypeBound                            | Anzahl Structs, die als Type Bound verwendet werden                           |
-| TypeDecl                                     | Gesamtanzahl aller Type-Deklarationen                                         |
-| GenericTypeDecl                              | Anzahl generischer Type-Deklarationen                                         |
-| GenericTypeSet                               | Anzahl Interfaces mit Type Sets                                               |
-| **Erweiterung 4: Generic Instantiations**    |                                                                               |
-| GenericFuncInstantiationExplicit             | Explizite Instanziierungen lokaler generischer Funktionen (z.B. `f[int](x)`)  |
-| GenericFuncInstantiationInferred             | Inferrierte Instanziierungen lokaler generischer Funktionen (z.B. `f(x)`)     |
-| GenericTypeInstantiationExplicit             | Explizite Instanziierungen lokaler generischer Types (z.B. `Box[int]{}`)      |
-| GenericTypeInstantiationInferred             | Inferrierte Instanziierungen lokaler generischer Types (z.B. `Box{value: 1}`) |
+| Metrik                                       | Beschreibung                                                                                                        |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| FuncTotal                                    | Gesamtanzahl aller Funktionen                                                                                       |
+| FuncGeneric                                  | Anzahl generischer Funktionen                                                                                       |
+| MethodTotal                                  | Gesamtanzahl aller Methoden                                                                                         |
+| MethodWithGenericReceiver                    | Anzahl Methoden mit generischem Receiver                                                                            |
+| MethodWithGenericReceiverTrivialTypeBound    | Anzahl Methoden mit generischem Receiver und trivialem Type Bound                                                   |
+| MethodWithGenericReceiverNonTrivialTypeBound | Anzahl Methoden mit generischem Receiver und non-trivial Type Bound                                                 |
+| StructTotal                                  | Gesamtanzahl aller Structs                                                                                          |
+| StructGeneric                                | Anzahl generischer Structs                                                                                          |
+| StructGenericBound                           | Anzahl generischer Structs mit non-trivial Type Bounds                                                              |
+| StructAsTypeBound                            | Anzahl Structs, die als Type Bound verwendet werden                                                                 |
+| TypeDecl                                     | Gesamtanzahl aller Type-Deklarationen                                                                               |
+| GenericTypeDecl                              | Anzahl generischer Type-Deklarationen                                                                               |
+| GenericTypeSet                               | Anzahl Interfaces mit Type Sets                                                                                     |
+| **Erweiterung 4: Generic Instantiations**    |                                                                                                                     |
+| GenericFuncInstantiationExplicit             | Explizite Instanziierungen lokaler generischer Funktionen (z.B. `f[int](x)`)                                        |
+| GenericFuncInstantiationInferred             | Inferrierte Instanziierungen lokaler generischer Funktionen (z.B. `f(x)`)                                           |
+| GenericTypeInstantiationExplicit             | Explizite Instanziierungen lokaler generischer Types (z.B. `Box[int]{}`)                                            |
+| GenericTypeInstantiationInferred             | Inferrierte Instanziierungen lokaler generischer Types (z.B. `Box{value: 1}`)                                       |
+| **Erweiterung 5: Method Instantiations**     |                                                                                                                     |
+| GenericMethodInstantiationInferred           | Inferrierte Instanziierungen durch Aufrufe auf generischen Receiver-Typen (z.B. `x.m()` wobei `x` vom Typ `S[int]`) |
 
 ---
 
@@ -172,7 +174,6 @@ type Container[T any] struct {
 - **Non-trivial bedeutet**: Type Bound ist NICHT `any`, NICHT `interface{}`, und NICHT ein leeres Interface
 - **Ermittlung**: Iteriert durch alle Type Parameters und prüft deren Constraints
 - **Prüfung für triviale Constraints**:
-
   1. Direktes `any`: `type Foo[T any]`
   2. Direktes `interface{}`: `type Foo[T interface{}]`
   3. Leeres Interface definiert anderswo:
@@ -196,11 +197,11 @@ type Simple3[T EmptyInterface] struct{}
 type Stringer interface {
     String() string
 }
-type Container[T Stringer] struct{} 
+type Container[T Stringer] struct{}
 
-type Numeric[T int | float64] struct{}  
+type Numeric[T int | float64] struct{}
 
-type Comparable[T comparable] struct{} 
+type Comparable[T comparable] struct{}
 ```
 
 #### StructAsTypeBound (**Erweiterung 2**)
@@ -396,32 +397,21 @@ Für eine vollständige Analyse ist es wichtig zu verstehen:
 
 **Technische Umsetzung**:
 
-**Phase 1 - Lokale Generics sammeln:**
+**Phase 1 – Generics sammeln:**
+
+`CollectAll()` durchläuft den AST einmal pro Datei und sammelt alle generischen Symbole (Funktionen und Typen) project-wide in einer gemeinsamen Map.
+
+**Phase 2 – Type Checking:**
+
+`types.Config.Check()` wird einmal pro Paket aufgerufen (nicht pro Datei) und liefert `types.Info` mit `Instances` (einer Map, die für jeden AST-Identifier, der eine generische Instantiierung darstellt, die zugehörigen Typ-Argumente enthält).
+
+**Phase 3 – Instantiierungen erkennen:**
 
 ```go
-// Sammelt alle generischen Funktionen im aktuellen File
-localGenerics := collectLocalGenerics(file)
-// Speichert: Name, isMethod flag, Anzahl Type Parameters
-```
+// Explizit: CallExpr.Fun ist IndexExpr oder IndexListExpr
+// -> GenericFuncInstantiationExplicit / GenericTypeInstantiationExplicit
 
-**Phase 2 - Explizite Instanziierungen (AST):**
-
-```go
-// Erkennt: z.B. f[int](x)
-// CallExpr.Fun ist IndexExpr oder IndexListExpr
-if indexExpr, ok := callExpr.Fun.(*ast.IndexExpr); ok {
-    // Explizite Typ-Angabe gefunden
-}
-```
-
-**Phase 3 - Inferrierte Instanziierungen (go/types):**
-
-```go
-// Setup Type Checker
-info := &types.Info{
-    Instances: make(map[*ast.Ident]types.Instance),
-}
-// Erkennt: f(x) wo f generisch ist
+// Inferiert: Identifier ist in types.Info.Instances vorhanden
 if _, hasInstance := info.Instances[ident]; hasInstance {
     // Type Inference wurde verwendet
 }
@@ -436,8 +426,8 @@ if _, hasInstance := info.Instances[ident]; hasInstance {
 | GenericTypeInstantiationExplicit | `Box[int]{}` - lokale Types                       |
 | GenericTypeInstantiationInferred | `Box{value: 1}` - lokale Types mit Type Inference |
 
-**Wichtige Anmerkung zu Methoden**:
-In Go können **Methoden selbst keine Type Parameters haben** - nur der Receiver-Typ kann generisch sein. Daher zählen wir keine "generic method instantiations", sondern nur generic function und generic type instantiations.
+**Anmerkung zu Methoden**:
+In Go können Methoden selbst keine eigenen Type Parameters haben, nur der Receiver-Typ kann generisch sein. Aufrufe auf generischen Receiver-Typen (z.B. `x.m()` wobei `x` vom Typ `S[int]` ist) werden seit Erweiterung 5 als `GenericMethodInstantiationInferred` gezählt (siehe Erweiterung 5).
 
 **Beispiele**:
 
@@ -485,3 +475,29 @@ func testTypes() {
 - Identifikation von Patterns: Werden Typen explizit angegeben oder inferriert?
 - Unterscheidung zwischen lokaler und externer Generic-Verwendung
 - Datengrundlage für die Frage: "Lohnt sich Type Inference?"
+
+---
+
+### Erweiterung 5: Generic Method Instantiations
+
+**Problem**: Aufrufe auf Methoden generischer Typen (z.B. `x.Push(1)` wobei `x` vom Typ `Stack[int]` ist) wurden bisher nicht als Instantiierungen gezählt, obwohl sie eine konkrete Verwendung eines generischen Typs darstellen.
+
+**Lösung**: Erkenne und zähle Methodenaufrufe auf generischen Receiver-Typen als `GenericMethodInstantiationInferred`.
+
+```go
+type Stack[T any] struct{ items []T }
+func (s *Stack[T]) Push(v T) { s.items = append(s.items, v) }
+
+func main() {
+    s := &Stack[int]{}
+    s.Push(1)   // → GenericMethodInstantiationInferred
+    s.Push(2)   // → GenericMethodInstantiationInferred
+}
+```
+
+**Warum nur Inferred, kein Explicit**: In Go ist die Syntax `x.m[int]()` nicht gültig, Typ-Argumente bei Methodenaufrufen können nicht explizit angegeben werden. Der Typ-Parameter wird immer aus dem Receiver-Typ inferiert.
+
+**Impact**:
+
+- Vollständigere Erfassung der tatsächlichen Generic-Nutzung
+- Methodenaufrufe auf generischen Typen sind in der Praxis häufig (z.B. Container-Typen wie `Stack`, `Queue`, `Map`)

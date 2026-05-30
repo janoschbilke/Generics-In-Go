@@ -17,7 +17,10 @@ Der `InstantiationDiversityCheck` (in `checks/instantiation_checks.go`) iteriert
 
 1. Ist dieser Identifier in `types.Info.Instances` vorhanden?
 2. Ist der zugehörige generische Typ/die Funktion **lokal definiert** (nicht aus einer externen Bibliothek)?
-3. Handelt es sich um einen Struct (`*types.Named` mit `*types.Struct` als Underlying) oder eine Funktion (`*types.Signature`)?
+3. Handelt es sich um:
+   - einen Struct (`*types.Named` mit `*types.Struct` als Underlying) → `KindStruct`
+   - eine Funktion (`*types.Signature`) → `KindFunc`
+   - eine Methode auf einem generischen Receiver-Typ (`*types.Signature` mit `Recv() != nil`) → `KindMethod`
 
 Für jede gefundene Instanziierung werden die Typ-Argumente als String gespeichert (z.B. `"int, string"`). Ist eines der Typ-Argumente selbst ein `*types.TypeParam` (also ein Typ-Parameter wie `T`, `K`, `V`), wird die Instanziierung als **parametrisch** markiert.
 
@@ -74,6 +77,9 @@ Instantiation diversity for local/LocalTestProject:
     GenericAdd: 2 concrete [float64, int]
     GenericPrint: 2 concrete [int, string]
     makeBox: 2 concrete [int, string]
+  [Methods on generic types]
+    Push: 1 concrete [int]
+    Pop: 1 concrete [int]
 ```
 
 **Verbesserungen:**
@@ -83,9 +89,11 @@ Instantiation diversity for local/LocalTestProject:
 
 ---
 
-## Warum unterscheiden sich die Zählungen? (15 vs. 17)
+## Warum unterscheiden sich die Zählungen?
 
-In `generic_counters.csv` stehen für das LocalTestProject:
+> **Hinweis**: Die folgenden Zahlen beziehen sich auf einen historischen Stand des LocalTestProject und dienen zur Illustration des Prinzips. Die konkreten Werte können sich mit dem aktuellen Projektstand unterscheiden.
+
+In `generic_counters.csv` stehen für das LocalTestProject (historischer Stand):
 
 | Spalte | Wert |
 | --- | --- |
@@ -93,24 +101,23 @@ In `generic_counters.csv` stehen für das LocalTestProject:
 | GenericFuncInstantiationInferred | 6 |
 | GenericTypeInstantiationExplicit | 3 |
 | GenericTypeInstantiationInferred | 2 |
-| **Summe** | **15** |
+| GenericMethodInstantiationInferred | (seit Erweiterung 5) |
+| **Summe** | **15+** |
 
-In `generic_counters_instantiation.csv` ergibt die Summe aller `ConcreteCount + ParametricCount` über alle Zeilen **17**.
+In `generic_counters_instantiation.csv` ergibt die Summe aller `ConcreteCount + ParametricCount` über alle Zeilen einen höheren Wert.
 
 Diese Diskrepanz ist **korrekt und erwartet**, weil die beiden Dateien unterschiedliche Dinge messen:
 
-**`generic_counters.csv`** zählt **Verwendungsstellen im Code** — also wie oft ein generischer Typ oder eine generische Funktion im Quellcode tatsächlich aufgerufen/instantiiert wird. Parametrische Instantiierungen (z.B. `Box[T]` in einer Methode mit generischem Receiver) sind **keine echten Verwendungsstellen** und werden hier nicht gezählt.
+**`generic_counters.csv`** zählt **Verwendungsstellen im Code** — also wie oft ein generischer Typ, eine generische Funktion oder eine Methode auf einem generischen Receiver-Typ im Quellcode tatsächlich aufgerufen/instantiiert wird. Parametrische Instantiierungen (z.B. `Box[T]` in einer Methode mit generischem Receiver) sind **keine echten Verwendungsstellen** und werden hier nicht gezählt.
 
 **`generic_counters_instantiation.csv`** zählt **eindeutige Typ-Argument-Kombinationen** — also wie viele verschiedene Typen für einen generischen Namen beobachtet wurden. Hier werden auch parametrische Einträge mitgezählt, weil sie zeigen, dass ein generischer Typ auch in anderen generischen Kontexten weiterverwendet wird.
 
-Die 17 Diversity-Einträge setzen sich zusammen aus:
+Beispiel (historischer Stand, ohne Methoden-Instantiierungen):
 
 - **8 konkrete** eindeutige Kombinationen: `Box[int]`, `Box[string]`, `GenericAdd[float64]`, `GenericAdd[int]`, `GenericPrint[int]`, `GenericPrint[string]`, `makeBox[int]`, `makeBox[string]`
 - **9 parametrische** Einträge: `Box[T]` + je `[T]` für die 8 Structs mit generischem Receiver
 
-Die 15 Verwendungsstellen hingegen zählen **wie oft** diese Kombinationen im Code vorkommen. Dabei kann dieselbe Kombination (z.B. `Box[int]`) mehrfach verwendet werden und zählt dann mehrfach. Parametrische Einträge zählen gar nicht mit, da sie keine echten Verwendungsstellen sind.
-
-Kurz: **8 konkrete unique Kombinationen + 9 parametrische Kombinationen = 17 Diversity-Einträge**, während die 15 Verwendungsstellen die tatsächliche Nutzungshäufigkeit im Code widerspiegeln.
+Die Verwendungsstellen zählen **wie oft** diese Kombinationen im Code vorkommen. Parametrische Einträge zählen nicht mit, da sie keine echten Verwendungsstellen sind.
 
 ## Bezug zur Compiler-Implementierung: Typspezifische Instantiierungen
 
