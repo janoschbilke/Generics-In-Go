@@ -6,7 +6,6 @@ import (
 	"sync"
 )
 
-
 type ProjectImporter struct {
 	mu       sync.Mutex
 	packages map[string]*types.Package

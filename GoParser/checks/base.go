@@ -14,11 +14,9 @@ type AnalysisContext struct {
 	File              *ast.File
 	Instantiations    model.InstantiationData // populated by InstantiationDiversityCheck
 
-	// Project-wide maps for cross-package instantiation counting.
-	// Keys are qualified: "<import/path>.<Name>"
 	ProjectLocalGenerics     map[string]*GenericDefinition
 	ProjectLocalGenericTypes map[string]bool
-	// Set of import paths that belong to the analysed project (not stdlib/third-party).
+	// Set of import paths that belong to the analysed project
 	ProjectImportPaths map[string]bool
 }
 

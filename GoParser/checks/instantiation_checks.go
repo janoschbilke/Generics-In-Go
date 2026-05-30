@@ -168,7 +168,6 @@ func (t *GenericTypeCompositeLitCheck) hasInstance(expr ast.Expr, context *Insta
 	return false
 }
 
-
 // Handles two node types:
 //   - *ast.Ident  → structs and free generic functions
 //   - *ast.SelectorExpr → methods on generic types

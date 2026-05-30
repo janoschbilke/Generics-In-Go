@@ -60,7 +60,7 @@ func FetchGoFilesList(owner, repo, token string) ([]model.FileInfo, error) {
 	if err != nil {
 		return nil, fmt.Errorf("konnte ZIP nicht entpacken: %w", err)
 	}
-	
+
 	prefix := zipTopLevelPrefix(zr)
 
 	var files []model.FileInfo

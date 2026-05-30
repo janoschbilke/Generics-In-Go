@@ -7,7 +7,7 @@ type SimpleStruct struct {
 }
 
 type ComplexStruct struct {
-	_  string
+	_ string
 	_ int
 }
 

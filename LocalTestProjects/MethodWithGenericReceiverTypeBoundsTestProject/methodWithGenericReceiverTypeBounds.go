@@ -12,9 +12,9 @@ type G2[T I[T]] struct {
 	_ T
 }
 
-func (x G[T]) someMethod()   {}
-func (x G[T]) anotherMethod() {}
-func (x G2[T]) someMethod()   {}
+func (x G[T]) someMethod()     {}
+func (x G[T]) anotherMethod()  {}
+func (x G2[T]) someMethod()    {}
 func (x G2[T]) anotherMethod() {}
 
 type SimpleContainer[T interface{}] struct {
