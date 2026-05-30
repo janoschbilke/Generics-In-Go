@@ -62,11 +62,7 @@ func (f *GenericFuncCallCheck) Update(counters *model.GenericCounters, node ast.
 		}
 
 		if isMethod {
-			if isExplicit {
-				counters.GenericMethodInstantiationExplicit++
-			} else {
-				counters.GenericMethodInstantiationInferred++
-			}
+			counters.GenericMethodInstantiationInferred++
 		} else {
 			if isExplicit {
 				counters.GenericFuncInstantiationExplicit++
