@@ -11,10 +11,11 @@ import (
 	"go/types"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 type ASTAnalyzer interface {
-	AnalyzeProject(files []model.FileInfo, enableTypeInference bool) (model.GenericCounters, model.InstantiationData, error)
+	AnalyzeProject(files []model.FileInfo, enableTypeInference bool) (model.GenericCounters, model.InstantiationData, model.AnalysisTiming, error)
 }
 
 type astAnalyzerImpl struct{}
@@ -23,13 +24,15 @@ func NewASTAnalyzer() ASTAnalyzer {
 	return &astAnalyzerImpl{}
 }
 
-func (a *astAnalyzerImpl) AnalyzeProject(files []model.FileInfo, enableTypeInference bool) (model.GenericCounters, model.InstantiationData, error) {
+func (a *astAnalyzerImpl) AnalyzeProject(files []model.FileInfo, enableTypeInference bool) (model.GenericCounters, model.InstantiationData, model.AnalysisTiming, error) {
 	var totalCounters model.GenericCounters
 	allInstantiations := make(model.InstantiationData)
+	var timing model.AnalysisTiming
 
 	packages := groupByPackage(files)
 
 	if !enableTypeInference {
+		t0 := time.Now()
 		for _, pkgFiles := range packages {
 			for _, f := range pkgFiles {
 				fset := token.NewFileSet()
@@ -47,20 +50,31 @@ func (a *astAnalyzerImpl) AnalyzeProject(files []model.FileInfo, enableTypeInfer
 				runner.RunChecks(astFile, &totalCounters, ctx)
 			}
 		}
-		return totalCounters, allInstantiations, nil
+		timing.CheckRunner = time.Since(t0)
+		timing.TotalAnalysis = timing.CheckRunner
+		return totalCounters, allInstantiations, timing, nil
 	}
 
 	moduleName := findModuleName(files)
 	projectImporter := importer.New()
 
+	t1 := time.Now()
 	parsedFilesToAST := parseFilesToASTPackage(packages, moduleName)
+	timing.ParseAST = time.Since(t1)
+
+	t2 := time.Now()
 	sortedDirs := utils.TopoSortPackages(parsedFilesToAST, moduleName)
+	timing.TopoSort = time.Since(t2)
 
+	t3 := time.Now()
 	checkedPackages := extractTypeInfoForPackages(sortedDirs, parsedFilesToAST, projectImporter)
+	timing.TypeCheck = time.Since(t3)
 
-	// Collect project-wide symbols for all packages to enable cross-package checks and store package-specific symbols for efficient access during checks (symbolsByPackage as caching mechanism)
+	t4 := time.Now()
 	projectLocalGenerics, projectLocalGenericTypes, projectImportPaths, symbolsByPackage := collectProjectSymbols(checkedPackages)
+	timing.CollectSymbols = time.Since(t4)
 
+	t5 := time.Now()
 	for _, cp := range checkedPackages {
 		pc := symbolsByPackage[cp.pkg.Dir]
 
@@ -83,8 +97,11 @@ func (a *astAnalyzerImpl) AnalyzeProject(files []model.FileInfo, enableTypeInfer
 			allInstantiations.Merge(ctx.Instantiations)
 		}
 	}
+	timing.CheckRunner = time.Since(t5)
 
-	return totalCounters, allInstantiations, nil
+	timing.TotalAnalysis = timing.ParseAST + timing.TopoSort + timing.TypeCheck + timing.CollectSymbols + timing.CheckRunner
+
+	return totalCounters, allInstantiations, timing, nil
 }
 
 type checkedPkg struct {

@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"log"
 	"path/filepath"
+	"time"
 
 	utils "GoParser/utils"
 )
 
-// AnalysisJob represents a single unit of analysis work: a named project and a way to fetch its files.
 type AnalysisJob struct {
 	Name       string
 	FetchFiles func() ([]model.FileInfo, error)
@@ -30,6 +30,12 @@ func main() {
 			log.Fatalf("Failed to close databases: %v", err)
 		}
 	}()
+
+	timingWriter, err := utils.NewTimingCSVWriter("../output/timing.csv")
+	if err != nil {
+		log.Fatalf("Failed to create timing CSV: %v", err)
+	}
+	defer timingWriter.Close()
 
 	astAnalyzer := NewASTAnalyzer()
 
@@ -76,7 +82,7 @@ func main() {
 
 	var results []model.GenericCounters
 	for _, job := range jobs {
-		counters, instantiations, err := processJob(job, astAnalyzer, dbs, config.EnableTypeInference)
+		counters, instantiations, err := processJob(job, astAnalyzer, dbs, config.EnableTypeInference, timingWriter)
 		if err != nil {
 			log.Println(err)
 			continue
@@ -98,19 +104,29 @@ func main() {
 	}
 }
 
-// processJob fetches files for a job, analyses the whole project at once,
-// prints a CSV row, and saves all results to the databases.
-func processJob(job AnalysisJob, analyzer ASTAnalyzer, dbs *utils.DatabaseSet, enableTypeInference bool) (model.GenericCounters, model.InstantiationData, error) {
+func processJob(job AnalysisJob, analyzer ASTAnalyzer, dbs *utils.DatabaseSet, enableTypeInference bool, timingWriter *utils.TimingCSVWriter) (model.GenericCounters, model.InstantiationData, error) {
+	tFetch := time.Now()
 	files, err := job.FetchFiles()
 	if err != nil {
 		return model.GenericCounters{}, nil, err
 	}
+	fetchDuration := time.Since(tFetch)
 
-	counters, instantiations, err := analyzer.AnalyzeProject(files, enableTypeInference)
+	counters, instantiations, timing, err := analyzer.AnalyzeProject(files, enableTypeInference)
 	if err != nil {
 		return model.GenericCounters{}, nil, fmt.Errorf("analysis failed: %w", err)
 	}
 	counters.Repository = job.Name
+
+	timing.Repository = job.Name
+	timing.FetchFiles = fetchDuration
+	timing.Total = timing.FetchFiles + timing.TotalAnalysis
+
+	if timingWriter != nil {
+		if err := timingWriter.WriteRow(timing); err != nil {
+			log.Printf("Warning: failed to write timing row: %v", err)
+		}
+	}
 
 	utils.PrintCSVRow(job.Name, counters)
 
